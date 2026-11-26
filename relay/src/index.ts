@@ -199,6 +199,7 @@ export default {
         label: clean(body.label, 24) || 'UNKNOWN',
         reason: clean(body.reason, MAX.description),
         ...(body.token ? { token: clean(body.token, 80) } : {}),
+        ...(body.agent ? { agent: clean(body.agent, 24) } : {}),
         ...(body.kind === 'plan'
           ? {
               kind: 'plan' as const,

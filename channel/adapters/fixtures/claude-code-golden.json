@@ -1,0 +1,733 @@
+{
+  "hook": {
+    "bash/allow": {
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"allow\"}}}",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "Bash",
+          "description": "Force push",
+          "session_id": "sess-1",
+          "key": "245cea6c573bbb73215bfa9c2a9a17f8",
+          "preview": "git push --force origin main",
+          "tier": 3,
+          "label": "DESTRUCTIVE",
+          "reason": "Rewrites history on main.",
+          "token": "main"
+        }
+      ]
+    },
+    "bash/deny": {
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"deny\",\"message\":\"The user denied this from Breakpoint.\"}}}",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "Bash",
+          "description": "Force push",
+          "session_id": "sess-1",
+          "key": "245cea6c573bbb73215bfa9c2a9a17f8",
+          "preview": "git push --force origin main",
+          "tier": 3,
+          "label": "DESTRUCTIVE",
+          "reason": "Rewrites history on main.",
+          "token": "main"
+        }
+      ]
+    },
+    "bash/redirect": {
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"deny\",\"message\":\"The user denied this from Breakpoint and said: \\\"use a branch instead\\\"\"}}}",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "Bash",
+          "description": "Force push",
+          "session_id": "sess-1",
+          "key": "245cea6c573bbb73215bfa9c2a9a17f8",
+          "preview": "git push --force origin main",
+          "tier": 3,
+          "label": "DESTRUCTIVE",
+          "reason": "Rewrites history on main.",
+          "token": "main"
+        }
+      ]
+    },
+    "bash/elsewhere": {
+      "stdout": "",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "Bash",
+          "description": "Force push",
+          "session_id": "sess-1",
+          "key": "245cea6c573bbb73215bfa9c2a9a17f8",
+          "preview": "git push --force origin main",
+          "tier": 3,
+          "label": "DESTRUCTIVE",
+          "reason": "Rewrites history on main.",
+          "token": "main"
+        }
+      ]
+    },
+    "bash/unknown": {
+      "stdout": "",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "Bash",
+          "description": "Force push",
+          "session_id": "sess-1",
+          "key": "245cea6c573bbb73215bfa9c2a9a17f8",
+          "preview": "git push --force origin main",
+          "tier": 3,
+          "label": "DESTRUCTIVE",
+          "reason": "Rewrites history on main.",
+          "token": "main"
+        }
+      ]
+    },
+    "rm/allow": {
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"allow\"}}}",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "Bash",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "2a7a32227ffc8b7003da0f1b8003a136",
+          "preview": "rm -rf ./dist",
+          "tier": 3,
+          "label": "DESTRUCTIVE",
+          "reason": "Deletes ./dist and everything under it.",
+          "token": "./dist"
+        }
+      ]
+    },
+    "rm/deny": {
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"deny\",\"message\":\"The user denied this from Breakpoint.\"}}}",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "Bash",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "2a7a32227ffc8b7003da0f1b8003a136",
+          "preview": "rm -rf ./dist",
+          "tier": 3,
+          "label": "DESTRUCTIVE",
+          "reason": "Deletes ./dist and everything under it.",
+          "token": "./dist"
+        }
+      ]
+    },
+    "rm/redirect": {
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"deny\",\"message\":\"The user denied this from Breakpoint and said: \\\"use a branch instead\\\"\"}}}",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "Bash",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "2a7a32227ffc8b7003da0f1b8003a136",
+          "preview": "rm -rf ./dist",
+          "tier": 3,
+          "label": "DESTRUCTIVE",
+          "reason": "Deletes ./dist and everything under it.",
+          "token": "./dist"
+        }
+      ]
+    },
+    "rm/elsewhere": {
+      "stdout": "",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "Bash",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "2a7a32227ffc8b7003da0f1b8003a136",
+          "preview": "rm -rf ./dist",
+          "tier": 3,
+          "label": "DESTRUCTIVE",
+          "reason": "Deletes ./dist and everything under it.",
+          "token": "./dist"
+        }
+      ]
+    },
+    "rm/unknown": {
+      "stdout": "",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "Bash",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "2a7a32227ffc8b7003da0f1b8003a136",
+          "preview": "rm -rf ./dist",
+          "tier": 3,
+          "label": "DESTRUCTIVE",
+          "reason": "Deletes ./dist and everything under it.",
+          "token": "./dist"
+        }
+      ]
+    },
+    "write/allow": {
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"allow\"}}}",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "Write",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "ed2736ad2285c40fd4b0a89e168702b6",
+          "preview": "Write /work/api/.env",
+          "tier": 3,
+          "label": "DESTRUCTIVE",
+          "reason": "Writes a secrets or key file.",
+          "token": ".env"
+        }
+      ]
+    },
+    "write/deny": {
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"deny\",\"message\":\"The user denied this from Breakpoint.\"}}}",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "Write",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "ed2736ad2285c40fd4b0a89e168702b6",
+          "preview": "Write /work/api/.env",
+          "tier": 3,
+          "label": "DESTRUCTIVE",
+          "reason": "Writes a secrets or key file.",
+          "token": ".env"
+        }
+      ]
+    },
+    "write/redirect": {
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"deny\",\"message\":\"The user denied this from Breakpoint and said: \\\"use a branch instead\\\"\"}}}",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "Write",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "ed2736ad2285c40fd4b0a89e168702b6",
+          "preview": "Write /work/api/.env",
+          "tier": 3,
+          "label": "DESTRUCTIVE",
+          "reason": "Writes a secrets or key file.",
+          "token": ".env"
+        }
+      ]
+    },
+    "write/elsewhere": {
+      "stdout": "",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "Write",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "ed2736ad2285c40fd4b0a89e168702b6",
+          "preview": "Write /work/api/.env",
+          "tier": 3,
+          "label": "DESTRUCTIVE",
+          "reason": "Writes a secrets or key file.",
+          "token": ".env"
+        }
+      ]
+    },
+    "write/unknown": {
+      "stdout": "",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "Write",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "ed2736ad2285c40fd4b0a89e168702b6",
+          "preview": "Write /work/api/.env",
+          "tier": 3,
+          "label": "DESTRUCTIVE",
+          "reason": "Writes a secrets or key file.",
+          "token": ".env"
+        }
+      ]
+    },
+    "fetch/allow": {
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"allow\"}}}",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "WebFetch",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "09d6c04d3273ebf02e3fe1acc3a9c33f",
+          "preview": "WebFetch https://example.com",
+          "tier": 2,
+          "label": "NETWORK",
+          "reason": "Fetches example.com.",
+          "token": "example.com"
+        }
+      ]
+    },
+    "fetch/deny": {
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"deny\",\"message\":\"The user denied this from Breakpoint.\"}}}",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "WebFetch",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "09d6c04d3273ebf02e3fe1acc3a9c33f",
+          "preview": "WebFetch https://example.com",
+          "tier": 2,
+          "label": "NETWORK",
+          "reason": "Fetches example.com.",
+          "token": "example.com"
+        }
+      ]
+    },
+    "fetch/redirect": {
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"deny\",\"message\":\"The user denied this from Breakpoint and said: \\\"use a branch instead\\\"\"}}}",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "WebFetch",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "09d6c04d3273ebf02e3fe1acc3a9c33f",
+          "preview": "WebFetch https://example.com",
+          "tier": 2,
+          "label": "NETWORK",
+          "reason": "Fetches example.com.",
+          "token": "example.com"
+        }
+      ]
+    },
+    "fetch/elsewhere": {
+      "stdout": "",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "WebFetch",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "09d6c04d3273ebf02e3fe1acc3a9c33f",
+          "preview": "WebFetch https://example.com",
+          "tier": 2,
+          "label": "NETWORK",
+          "reason": "Fetches example.com.",
+          "token": "example.com"
+        }
+      ]
+    },
+    "fetch/unknown": {
+      "stdout": "",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "WebFetch",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "09d6c04d3273ebf02e3fe1acc3a9c33f",
+          "preview": "WebFetch https://example.com",
+          "tier": 2,
+          "label": "NETWORK",
+          "reason": "Fetches example.com.",
+          "token": "example.com"
+        }
+      ]
+    },
+    "mcp/allow": {
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"allow\"}}}",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "mcp__db__query",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "2bb038be6e9707d0dfa2b8d205465f4b",
+          "preview": "mcp__db__query {\"sql\":\"drop table users\"}",
+          "tier": 2,
+          "label": "OUTSIDE PROJECT",
+          "reason": "Calls the db tool server.",
+          "token": "query"
+        }
+      ]
+    },
+    "mcp/deny": {
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"deny\",\"message\":\"The user denied this from Breakpoint.\"}}}",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "mcp__db__query",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "2bb038be6e9707d0dfa2b8d205465f4b",
+          "preview": "mcp__db__query {\"sql\":\"drop table users\"}",
+          "tier": 2,
+          "label": "OUTSIDE PROJECT",
+          "reason": "Calls the db tool server.",
+          "token": "query"
+        }
+      ]
+    },
+    "mcp/redirect": {
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"deny\",\"message\":\"The user denied this from Breakpoint and said: \\\"use a branch instead\\\"\"}}}",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "mcp__db__query",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "2bb038be6e9707d0dfa2b8d205465f4b",
+          "preview": "mcp__db__query {\"sql\":\"drop table users\"}",
+          "tier": 2,
+          "label": "OUTSIDE PROJECT",
+          "reason": "Calls the db tool server.",
+          "token": "query"
+        }
+      ]
+    },
+    "mcp/elsewhere": {
+      "stdout": "",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "mcp__db__query",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "2bb038be6e9707d0dfa2b8d205465f4b",
+          "preview": "mcp__db__query {\"sql\":\"drop table users\"}",
+          "tier": 2,
+          "label": "OUTSIDE PROJECT",
+          "reason": "Calls the db tool server.",
+          "token": "query"
+        }
+      ]
+    },
+    "mcp/unknown": {
+      "stdout": "",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "mcp__db__query",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "2bb038be6e9707d0dfa2b8d205465f4b",
+          "preview": "mcp__db__query {\"sql\":\"drop table users\"}",
+          "tier": 2,
+          "label": "OUTSIDE PROJECT",
+          "reason": "Calls the db tool server.",
+          "token": "query"
+        }
+      ]
+    },
+    "plan/allow": {
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"allow\",\"updatedInput\":{\"plan\":\"# Add login\\n\\n1. Add the route\\n2. Hash passwords\\n3. Write tests\\n4. Update docs\\n5. Ship\"}}}}",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "ExitPlanMode",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "780ea1b508ac55bbc73b975a0c7aa07d",
+          "kind": "plan",
+          "preview": "Add login",
+          "steps": [
+            "Add the route",
+            "Hash passwords",
+            "Write tests"
+          ],
+          "more": 2,
+          "tier": 2,
+          "label": "PLAN",
+          "reason": ""
+        }
+      ]
+    },
+    "plan/deny": {
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"deny\",\"message\":\"The user rejected the plan from Breakpoint.\"}}}",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "ExitPlanMode",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "780ea1b508ac55bbc73b975a0c7aa07d",
+          "kind": "plan",
+          "preview": "Add login",
+          "steps": [
+            "Add the route",
+            "Hash passwords",
+            "Write tests"
+          ],
+          "more": 2,
+          "tier": 2,
+          "label": "PLAN",
+          "reason": ""
+        }
+      ]
+    },
+    "plan/redirect": {
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"deny\",\"message\":\"The user rejected the plan from Breakpoint and said: \\\"use a branch instead\\\"\"}}}",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "ExitPlanMode",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "780ea1b508ac55bbc73b975a0c7aa07d",
+          "kind": "plan",
+          "preview": "Add login",
+          "steps": [
+            "Add the route",
+            "Hash passwords",
+            "Write tests"
+          ],
+          "more": 2,
+          "tier": 2,
+          "label": "PLAN",
+          "reason": ""
+        }
+      ]
+    },
+    "plan/elsewhere": {
+      "stdout": "",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "ExitPlanMode",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "780ea1b508ac55bbc73b975a0c7aa07d",
+          "kind": "plan",
+          "preview": "Add login",
+          "steps": [
+            "Add the route",
+            "Hash passwords",
+            "Write tests"
+          ],
+          "more": 2,
+          "tier": 2,
+          "label": "PLAN",
+          "reason": ""
+        }
+      ]
+    },
+    "plan/unknown": {
+      "stdout": "",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "api",
+          "tool": "ExitPlanMode",
+          "description": "",
+          "session_id": "sess-1",
+          "key": "780ea1b508ac55bbc73b975a0c7aa07d",
+          "kind": "plan",
+          "preview": "Add login",
+          "steps": [
+            "Add the route",
+            "Hash passwords",
+            "Write tests"
+          ],
+          "more": 2,
+          "tier": 2,
+          "label": "PLAN",
+          "reason": ""
+        }
+      ]
+    },
+    "bare/allow": {
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"allow\"}}}",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "",
+          "tool": "Bash",
+          "description": "",
+          "session_id": "sess-2",
+          "key": "b3f2f59b5c1895b8ec112ce8f5b7f179",
+          "preview": "Bash {}",
+          "tier": 2,
+          "label": "UNKNOWN",
+          "reason": "Not a command Breakpoint recognises."
+        }
+      ]
+    },
+    "bare/deny": {
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"deny\",\"message\":\"The user denied this from Breakpoint.\"}}}",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "",
+          "tool": "Bash",
+          "description": "",
+          "session_id": "sess-2",
+          "key": "b3f2f59b5c1895b8ec112ce8f5b7f179",
+          "preview": "Bash {}",
+          "tier": 2,
+          "label": "UNKNOWN",
+          "reason": "Not a command Breakpoint recognises."
+        }
+      ]
+    },
+    "bare/redirect": {
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"deny\",\"message\":\"The user denied this from Breakpoint and said: \\\"use a branch instead\\\"\"}}}",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "",
+          "tool": "Bash",
+          "description": "",
+          "session_id": "sess-2",
+          "key": "b3f2f59b5c1895b8ec112ce8f5b7f179",
+          "preview": "Bash {}",
+          "tier": 2,
+          "label": "UNKNOWN",
+          "reason": "Not a command Breakpoint recognises."
+        }
+      ]
+    },
+    "bare/elsewhere": {
+      "stdout": "",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "",
+          "tool": "Bash",
+          "description": "",
+          "session_id": "sess-2",
+          "key": "b3f2f59b5c1895b8ec112ce8f5b7f179",
+          "preview": "Bash {}",
+          "tier": 2,
+          "label": "UNKNOWN",
+          "reason": "Not a command Breakpoint recognises."
+        }
+      ]
+    },
+    "bare/unknown": {
+      "stdout": "",
+      "code": 0,
+      "posted": [
+        {
+          "id": "<id>",
+          "session": "",
+          "tool": "Bash",
+          "description": "",
+          "session_id": "sess-2",
+          "key": "b3f2f59b5c1895b8ec112ce8f5b7f179",
+          "preview": "Bash {}",
+          "tier": 2,
+          "label": "UNKNOWN",
+          "reason": "Not a command Breakpoint recognises."
+        }
+      ]
+    }
+  },
+  "activity": {
+    "postToolUse": {
+      "stdout": "",
+      "code": 0,
+      "posted": [
+        {
+          "session_id": "sess-1",
+          "event": "tool_done",
+          "key": "3def8390520b23ee38d810bbd40e58cf"
+        }
+      ]
+    },
+    "denied": {
+      "stdout": "",
+      "code": 0,
+      "posted": [
+        {
+          "session_id": "sess-1",
+          "event": "tool_done",
+          "key": "9180efdfcf250d3ed73fcae9a3cb89c3"
+        }
+      ]
+    },
+    "stop": {
+      "stdout": "",
+      "code": 0,
+      "posted": [
+        {
+          "session_id": "sess-1",
+          "event": "stop"
+        }
+      ]
+    },
+    "noSession": {
+      "stdout": "",
+      "code": 0,
+      "posted": []
+    }
+  }
+}

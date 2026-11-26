@@ -18,6 +18,12 @@ No AI decides anything on your approvals. Rules classify, you decide.
 
 > Early days: this is being built during the Heads Up hackathon (Even Realities, 23 to 29 Nov 2026). The parts marked *working* below run today, tested in the Even Hub simulator rather than on real glasses so far. Everything else is on the way, and this README changes as it lands.
 
+## Works with
+
+- **Claude Code** *(working)*, through its `PermissionRequest` hook.
+
+Nothing else is claimed as working. Other agents are under [Next](#next).
+
 ## What it does
 
 - **Answers Claude Code from your glasses.** *(working)* Claude Code runs Breakpoint's hook whenever it's about to ask you something. The request travels through a small relay to the glasses, where a tap allows it and a swipe down denies it. The terminal dialog stays open too, so whichever answer comes first wins and you can always answer at your desk.
@@ -114,7 +120,18 @@ Claude Code has a research-preview feature called channels, which can also relay
 
 [Permission hooks](https://code.claude.com/docs/en/hooks) are a stable, documented part of Claude Code. They work on any account, see the full command instead of a shortened preview, and need one settings entry instead of a startup flag.
 
+The relay, glasses and risk tiers are agent-agnostic. Supporting another agent means writing an adapter (`channel/adapters/`), not rebuilding Breakpoint.
+
 ## Next
+
+- **Other coding agents.** Everything below is planned and untested. Each needs an adapter; the hook command names it with `--agent`.
+
+  | Agent | Hook | Notes |
+  | --- | --- | --- |
+  | Codex CLI (ChatGPT) | `PermissionRequest`, same shape as Claude Code | Closest fit. Codex has to trust the hook first, through `/hooks`. |
+  | GitHub Copilot CLI | `permissionRequest` (an allow or deny short-circuits; no output falls through) | camelCase input (`toolName`, `toolArgs`). |
+  | Gemini CLI | `BeforeTool` (synchronous, can block) | Fires on every tool call, so Breakpoint's tiers do the filtering. The default hook timeout is 60 s, so it needs a long one. |
+  | Cursor | `beforeShellExecution` | Deny only for now: allow and ask are ignored, reported as a known bug on Cursor's forum. So Breakpoint could veto, not approve. |
 
 - **Tell your own voice from a meeting around you.** The glasses tag each audio frame as you, someone else or unknown. That could separate "I'm talking" from "a conversation is happening near me", which deserve different waits.
 - **Team policies:** shared rules for which commands count as destructive, and receipts to a team channel.

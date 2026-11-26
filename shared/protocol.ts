@@ -25,6 +25,8 @@ export type CardRequest = {
   /** Plan cards: up to three key steps, and how many more there are. */
   steps?: string[]
   more?: number
+  /** Which coding agent asked, e.g. 'claude-code'. Set by the hook's adapter. */
+  agent?: string
   created_at: number
 }
 

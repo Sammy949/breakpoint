@@ -23,7 +23,8 @@ const bun = process.execPath
 const MARK = join(repo, 'channel') // identifies our entries on re-runs
 // A non-default config path (BREAKPOINT_CONFIG) is baked into the hook commands.
 const env = process.env.BREAKPOINT_CONFIG ? `BREAKPOINT_CONFIG="${resolve(process.env.BREAKPOINT_CONFIG)}" ` : ''
-const cmd = (file: string) => `${env}"${bun}" "${join(repo, 'channel', file)}"`
+// The adapter is named explicitly; the hooks never guess the agent from the payload.
+const cmd = (file: string) => `${env}"${bun}" "${join(repo, 'channel', file)}" --agent claude-code`
 
 type HookEntry = { matcher?: string; hooks: { type: string; command: string; [k: string]: unknown }[] }
 type Settings = { permissions?: { ask?: string[]; [k: string]: unknown }; hooks?: Record<string, HookEntry[]>; [k: string]: unknown }

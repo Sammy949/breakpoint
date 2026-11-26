@@ -1,9 +1,10 @@
 #!/usr/bin/env bun
-// Claude Code PermissionRequest hook.
+// Permission hook. Usage: hook.ts [--agent claude-code]
 //
-// Claude Code runs this when it is about to ask for permission. The hook sends
-// the request to the relay, which shows it on the paired glasses, then polls
-// for a verdict. The terminal dialog stays open the whole time; if nothing
+// The agent runs this when it is about to ask for permission. The adapter
+// (channel/adapters) reads the agent's payload and writes its reply; the rest
+// is agent-agnostic. The hook sends the request to the relay, which shows it
+// on the paired glasses, then polls for a verdict. The terminal dialog stays open the whole time; if nothing
 // arrives, or anything goes wrong, the hook prints nothing and the terminal
 // decides. It never approves on its own.
 
@@ -11,20 +12,13 @@ import { writeFileSync } from 'node:fs'
 import { basename } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { loadConfig } from './config'
-import { callKey } from './key'
-import type { PollResult } from '../shared/protocol'
+import { selectAdapter } from './adapters'
+import type { PollResult, Verdict } from '../shared/protocol'
 import { classify } from '../shared/risk'
 import { summarisePlan } from '../shared/plan'
 
 const WAIT_MS = Number(process.env.BREAKPOINT_WAIT_MS ?? 25 * 60_000)
 const POLL_MS = 1000
-
-type HookInput = {
-  session_id?: string
-  cwd?: string
-  tool_name?: string
-  tool_input?: Record<string, unknown>
-}
 
 /** The one line that tells you what the call does: the command, or the path. */
 export function previewOf(tool: string, input: Record<string, unknown> = {}): string {
@@ -34,27 +28,8 @@ export function previewOf(tool: string, input: Record<string, unknown> = {}): st
   return `${tool} ${JSON.stringify(input)}`
 }
 
-function decide(behavior: 'allow' | 'deny', redirect?: string): never {
-  const what = isPlan ? 'rejected the plan' : 'denied this'
-  const out = JSON.stringify({
-    hookSpecificOutput: {
-      hookEventName: 'PermissionRequest',
-      decision:
-        behavior === 'allow'
-          ? // Plan approvals are ignored by Claude Code unless the input is echoed
-            // back (verified on v2.1.332). Tool calls get a plain allow, because
-            // updated input is re-checked against ask rules.
-            isPlan
-            ? { behavior: 'allow', updatedInput: input.tool_input }
-            : { behavior: 'allow' }
-          : {
-              behavior: 'deny',
-              message: redirect
-                ? `The user ${what} from Breakpoint and said: "${redirect}"`
-                : `The user ${what} from Breakpoint.`,
-            },
-    },
-  })
+function decide(verdict: Verdict): never {
+  const out = adapter.formatVerdict(verdict, request)
   process.stdout.write(out)
   if (process.env.BREAKPOINT_DEBUG_DIR) writeFileSync(`${process.env.BREAKPOINT_DEBUG_DIR}/${Date.now()}-decision.json`, out)
   process.exit(0)
@@ -63,39 +38,39 @@ function decide(behavior: 'allow' | 'deny', redirect?: string): never {
 // No decision: the terminal dialog handles it.
 const pass = (): never => process.exit(0)
 
+const adapter = selectAdapter(process.argv.slice(2))
 const config = loadConfig()
 if (!config) pass()
 const { relay, token } = config!
 const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
 
 const raw = await Bun.stdin.text()
-const input = JSON.parse(raw) as HookInput
-// Debugging aid: keep a copy of what Claude Code sent (never set by default).
+const request = adapter.parseInput(raw)
+// Debugging aid: keep a copy of what the agent sent (never set by default).
 if (process.env.BREAKPOINT_DEBUG_DIR) {
-  await Bun.write(`${process.env.BREAKPOINT_DEBUG_DIR}/${Date.now()}-${input.tool_name}.json`, raw)
+  await Bun.write(`${process.env.BREAKPOINT_DEBUG_DIR}/${Date.now()}-${request.toolName}.json`, raw)
 }
-const tool = input.tool_name ?? 'unknown'
+const tool = request.toolName
 const id = randomBytes(8).toString('hex').slice(0, 10)
-const description = typeof input.tool_input?.description === 'string' ? input.tool_input.description : ''
-const isPlan = tool === 'ExitPlanMode'
-const plan = isPlan ? summarisePlan(String(input.tool_input?.plan ?? '')) : null
-const risk = classify({ tool, input: input.tool_input ?? {}, cwd: input.cwd })
+const plan = request.plan !== undefined ? summarisePlan(request.plan) : null
+const risk = classify({ tool, input: request.input, cwd: request.cwd })
 
 const added = await fetch(`${relay}/v1/requests`, {
   method: 'POST',
   headers,
   body: JSON.stringify({
     id,
-    session: basename(input.cwd ?? ''),
+    session: basename(request.cwd ?? ''),
     tool,
-    description,
+    description: request.description,
     // Lets PostToolUse / PermissionDenied / Stop hooks clear this card if it's answered at the desk.
-    session_id: input.session_id,
-    key: callKey(tool, input.tool_input),
+    session_id: request.sessionId,
+    key: request.key,
+    agent: request.agent,
     ...(plan
       ? { kind: 'plan', preview: plan.title, steps: plan.steps, more: plan.more, tier: 2, label: 'PLAN', reason: '' }
       : {
-          preview: previewOf(tool, input.tool_input),
+          preview: previewOf(tool, request.input),
           tier: risk.tier,
           label: risk.label,
           reason: risk.reason,
@@ -123,7 +98,7 @@ while (Date.now() < deadline) {
     .then(r => r.json())
     .catch(() => null)) as PollResult | null
   if (!res || res.status === 'pending') continue
-  if (res.status === 'decided') decide(res.behavior, res.redirect)
+  if (res.status === 'decided') decide({ behavior: res.behavior, redirect: res.redirect })
   pass() // elsewhere: answered at the desk. unknown: cancelled, or the relay lost it.
 }
 await cancel('timeout')
