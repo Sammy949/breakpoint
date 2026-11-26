@@ -1,0 +1,13 @@
+{
+  "name": "breakpoint",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "channel": "bun channel/server.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.7"
+  }
+}
