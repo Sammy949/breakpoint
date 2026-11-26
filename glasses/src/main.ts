@@ -16,7 +16,7 @@ import {
   type PickerState,
   type Sequence,
 } from '../../shared/confirm'
-import { renderCard, renderIdle, renderPicker, type Status } from './render'
+import { renderCard, renderIdle, renderPicker, renderPlan, type Status } from './render'
 
 type Pairing = { relay: string; room: string; token: string }
 
@@ -83,6 +83,7 @@ function draw() {
   let content: string
   if (!card || !view) content = renderIdle(status, flash)
   else if (view.mode === 'picker') content = renderPicker(card, view.state)
+  else if (card.kind === 'plan') content = renderPlan(card, 0, cards.length)
   else content = renderCard(card, 0, cards.length, view.state, view.variant)
   bridge.textContainerUpgrade(new TextContainerUpgrade({ containerID: 1, containerName: 'main', content }))
 }
@@ -152,7 +153,12 @@ function send(behavior: 'allow' | 'deny', redirect?: string) {
   console.log('breakpoint: verdict', behavior, redirect ?? '')
   clearTimeout(pickerTimer)
   cards = cards.slice(1)
-  showFlash(behavior === 'allow' ? 'Allowed' : redirect ? 'Denied, reply sent' : 'Denied')
+  const plan = card.kind === 'plan'
+  showFlash(
+    behavior === 'allow'
+      ? plan ? 'Plan approved' : 'Allowed'
+      : redirect ? (plan ? 'Feedback sent' : 'Denied, reply sent') : plan ? 'Plan rejected' : 'Denied',
+  )
   draw()
 }
 

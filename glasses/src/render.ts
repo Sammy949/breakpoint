@@ -48,14 +48,26 @@ export function renderCard(card: CardRequest, index: number, total: number, stat
   return lines.join('\n')
 }
 
+export function renderPlan(card: CardRequest, index: number, total: number) {
+  const steps = (card.steps ?? []).map((s, i) => `${i + 1}. ${oneLine(s, LINE - 3)}`)
+  if (card.more) steps.push(`   and ${card.more} more`)
+  return [
+    `${oneLine(card.session || 'session', 20)} · PLAN${total > 1 ? `   ${index + 1} of ${total}` : ''}`,
+    oneLine(card.preview, LINE),
+    ...steps,
+    '',
+    'TAP: approve plan · SWIPE DOWN: send feedback',
+  ].join('\n')
+}
+
 export function renderPicker(card: CardRequest, picker: PickerState) {
   return [
-    `${oneLine(card.session || 'session', 20)} · denying`,
+    `${oneLine(card.session || 'session', 20)} · ${card.kind === 'plan' ? 'plan feedback' : 'denying'}`,
     oneLine(card.preview, LINE),
-    'Tell Claude what to do instead?',
+    card.kind === 'plan' ? 'What should change?' : 'Tell Claude what to do instead?',
     ...picker.options.map((o, i) => `${i === picker.index ? '>' : ' '} ${oneLine(o, LINE - 2)}`),
     '',
-    'TAP: send · SWIPE: choose · DOUBLE TAP: just deny',
+    card.kind === 'plan' ? 'TAP: send · SWIPE: choose · DOUBLE TAP: just reject' : 'TAP: send · SWIPE: choose · DOUBLE TAP: just deny',
   ].join('\n')
 }
 
