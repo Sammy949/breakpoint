@@ -122,7 +122,7 @@ export function feedPicker(state: PickerState, gesture: Gesture): PickerResult {
 }
 
 /** Fixed redirect replies, picked by what the command was doing. */
-export function redirectsFor(risk: Pick<Risk, 'tier' | 'label' | 'reason'>, preview: string): string[] {
+export function redirectsFor(risk: { tier: Tier; label: Risk['label'] | string }, preview: string): string[] {
   const p = preview.toLowerCase()
   const desk = "Wait, I'll do it at my desk"
   if (/\bgit\s+push\b/.test(p)) return ['Use a new branch instead', 'Run the tests first', desk]

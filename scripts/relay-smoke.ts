@@ -75,6 +75,7 @@ const addRes = (await (
 check('add reports glasses connected', addRes.glasses === true)
 const added = await waitFor(m => m.type === 'add')
 check('glasses receive the card', added?.type === 'add' && added.request.id === 'abcde')
+check('a request with no tier is treated as T2', added?.type === 'add' && added.request.tier === 2)
 check(
   'control and bidi characters are stripped',
   added?.type === 'add' && added.request.preview === 'git push --force origin main',

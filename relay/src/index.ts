@@ -94,6 +94,11 @@ export default {
         tool: clean(body.tool, MAX.tool),
         preview: clean(body.preview, MAX.preview),
         description: clean(body.description, MAX.description),
+        // Unknown or missing tiers are treated as T2, never as safe.
+        tier: body.tier === 1 || body.tier === 3 ? body.tier : 2,
+        label: clean(body.label, 24) || 'UNKNOWN',
+        reason: clean(body.reason, MAX.description),
+        ...(body.token ? { token: clean(body.token, 80) } : {}),
         created_at: Date.now(),
       }
       return json(await stub.add(card, clean(body.session_id, 80), clean(body.key, 64)))

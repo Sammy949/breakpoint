@@ -12,6 +12,7 @@ import { randomBytes } from 'node:crypto'
 import { loadConfig } from './config'
 import { callKey } from './key'
 import type { PollResult } from '../shared/protocol'
+import { classify } from '../shared/risk'
 
 const WAIT_MS = Number(process.env.BREAKPOINT_WAIT_MS ?? 25 * 60_000)
 const POLL_MS = 1000
@@ -63,6 +64,7 @@ const input = JSON.parse(await Bun.stdin.text()) as HookInput
 const tool = input.tool_name ?? 'unknown'
 const id = randomBytes(8).toString('hex').slice(0, 10)
 const description = typeof input.tool_input?.description === 'string' ? input.tool_input.description : ''
+const risk = classify({ tool, input: input.tool_input ?? {}, cwd: input.cwd })
 
 const added = await fetch(`${relay}/v1/requests`, {
   method: 'POST',
@@ -73,6 +75,10 @@ const added = await fetch(`${relay}/v1/requests`, {
     tool,
     preview: previewOf(tool, input.tool_input),
     description,
+    tier: risk.tier,
+    label: risk.label,
+    reason: risk.reason,
+    token: risk.token,
     // Lets PostToolUse / PermissionDenied / Stop hooks clear this card if it's answered at the desk.
     session_id: input.session_id,
     key: callKey(tool, input.tool_input),

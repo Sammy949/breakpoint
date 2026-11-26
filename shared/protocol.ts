@@ -13,6 +13,13 @@ export type CardRequest = {
   preview: string
   /** Claude's own description of the call, if it gave one. */
   description: string
+  /** Risk tier from shared/risk.ts, worked out on the laptop. */
+  tier: 1 | 2 | 3
+  label: string
+  /** One-line consequence, e.g. "Rewrites history on main." */
+  reason: string
+  /** What to check: branch, path, host or package. */
+  token?: string
   created_at: number
 }
 
