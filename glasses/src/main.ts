@@ -83,9 +83,10 @@ function connect(p: Pairing) {
     if (msg.type === 'remove') {
       const wasShown = cards[0]?.id === msg.id
       cards = cards.filter(c => c.id !== msg.id)
-      if (wasShown && msg.reason === 'cancelled') showFlash('Answered at the desk')
+      if (wasShown && msg.reason === 'elsewhere') showFlash('Answered at the desk')
+      if (wasShown && msg.reason === 'cancelled') showFlash('Timed out. Answer in the terminal.')
     }
-    console.log('breakpoint: relay', msg.type, cards.length, 'waiting')
+    console.log('breakpoint: relay', msg.type, msg.type === 'remove' ? msg.reason : '', cards.length, 'waiting')
     draw()
   }
   sock.onclose = ev => {
