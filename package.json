@@ -3,11 +3,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "channel": "bun channel/server.ts",
-    "test": "vitest run"
+    "typecheck": "tsc --noEmit",
+    "pair": "bun scripts/pair.ts",
+    "smoke": "bun scripts/relay-smoke.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
     "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.5",
+    "typescript": "^7.0.2"
   }
 }
