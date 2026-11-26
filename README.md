@@ -98,14 +98,14 @@ A quick tunnel's URL changes every run. For a lasting one, deploy the relay to y
 cd relay && bun run deploy
 ```
 
-Pair against the `workers.dev` URL it prints. For Telegram, also run `bunx wrangler secret put TELEGRAM_BOT_TOKEN` in `relay/`. To install the app on real glasses, put that URL in `glasses/.env` as `VITE_BREAKPOINT_RELAY` (see `.env.example`) and run `bun run pack` in `glasses/`, which adds the relay to the app's network allowlist. A relay for judges will be linked from the submission page.
+Pair against the `workers.dev` URL it prints. For Telegram, also run `bunx wrangler secret put TELEGRAM_BOT_TOKEN` in `relay/`. To install the app on real glasses, put that URL in `glasses/.env` as `VITE_BREAKPOINT_RELAY` (see `.env.example`) and run `bun run pack` in `glasses/`, which adds the relay to the app's network allowlist. A relay for judges will be linked from the submission page. It's the same code deployed with `bun run deploy:judges`, which adds caps: 20 waiting requests per laptop, 8 KB per request, 5 pairings per address per hour, a daily limit on new requests and pairings, and pairings that expire after 2 idle hours. `bun scripts/caps-smoke.ts <url>` checks them.
 
 ## Privacy
 
 - No account, no telemetry, no analytics.
 - The relay passes messages between your laptop and your phone. Waiting requests are held in memory and never written to disk. Without Telegram, the only thing it stores is a hash of your glasses' pairing token.
 - Only a one-line preview of the command or file path, Claude's description of it, and the project folder name leave the laptop. For plans, that's the title and up to three steps. The relay strips control characters and caps their length before they reach the glasses.
-- **If you link Telegram,** each request sent there and each destructive receipt (the same preview, session name and outcome) passes through Telegram's servers. The relay stores your Telegram user ID, chat ID and receipt channel, if you set one, to know where to send them and whose answers count. `/stop` deletes them.
+- **If you link Telegram,** each request sent there and each destructive receipt (the same preview, session name and outcome) passes through Telegram's servers. The bot runs inside the relay: Telegram delivers your button taps and replies to the relay's webhook, which checks Telegram's secret header before acting on them. The relay stores your Telegram user ID, chat ID and receipt channel, if you set one, to know where to send them and whose answers count. `/stop` deletes them.
 - Your laptop's relay token is saved in `~/.config/breakpoint/config.json`, outside the repo.
 
 ## Why hooks and not channels

@@ -1,4 +1,5 @@
 {
+  // The default deployment has no caps: it's for your own use.
   "name": "breakpoint-relay",
   "main": "src/index.ts",
   "compatibility_date": "2026-11-01",
@@ -8,5 +9,28 @@
       { "name": "PAIRING", "class_name": "Pairing" }
     ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room", "Pairing"] }]
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room", "Pairing"] }],
+
+  "env": {
+    // A copy for hackathon judges to try Breakpoint without deploying their own:
+    // `bun run deploy:judges`. Same code, separate Durable Objects, with caps.
+    // DAILY_CAP counts new requests and pairings, not polls.
+    "judges": {
+      "name": "breakpoint-judges",
+      "durable_objects": {
+        "bindings": [
+          { "name": "ROOMS", "class_name": "Room" },
+          { "name": "PAIRING", "class_name": "Pairing" }
+        ]
+      },
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room", "Pairing"] }],
+      "vars": {
+        "MAX_PENDING": "20",
+        "MAX_BODY_BYTES": "8192",
+        "PAIRS_PER_IP_HOUR": "5",
+        "ROOM_IDLE_HOURS": "2",
+        "DAILY_CAP": "3000"
+      }
+    }
+  }
 }

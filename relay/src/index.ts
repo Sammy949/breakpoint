@@ -32,7 +32,32 @@ interface Env {
   PAIRING: DurableObjectNamespace<Pairing>
   /** Optional. Without it the relay runs as before, with no Telegram. */
   TELEGRAM_BOT_TOKEN?: string
+  // Optional caps for a shared deployment (see wrangler.jsonc env "judges").
+  // Each one is off when unset.
+  MAX_PENDING?: string
+  MAX_BODY_BYTES?: string
+  PAIRS_PER_IP_HOUR?: string
+  ROOM_IDLE_HOURS?: string
+  DAILY_CAP?: string
 }
+
+const cap = (v: string | undefined) => (v && Number(v) > 0 ? Number(v) : Infinity)
+
+/** Read a JSON body, refusing anything over the size cap. Null if too big or not JSON. */
+async function readBody<T>(req: Request, env: Env): Promise<{ body: T | null; tooBig: boolean }> {
+  const max = cap(env.MAX_BODY_BYTES)
+  if (Number(req.headers.get('Content-Length') ?? 0) > max) return { body: null, tooBig: true }
+  const text = await req.text().catch(() => '')
+  if (new TextEncoder().encode(text).length > max) return { body: null, tooBig: true }
+  try {
+    return { body: JSON.parse(text) as T, tooBig: false }
+  } catch {
+    return { body: null, tooBig: false }
+  }
+}
+
+const TOO_BIG = () => json({ error: 'request too large' }, 413)
+const BUSY = (what: string) => json({ error: what }, 429)
 
 /** Glasses closed this long: requests go to Telegram instead. */
 const FALLBACK_MS = 20_000
@@ -103,10 +128,16 @@ export default {
 
     if (path === '/' || path === '/v1/health') return json({ ok: true, service: 'breakpoint-relay' })
 
+    const registry = env.PAIRING.get(env.PAIRING.idFromName('registry'))
+    const dailyCap = cap(env.DAILY_CAP)
+
     if (path === '/v1/pair/claim' && req.method === 'POST') {
-      const { code } = (await req.json().catch(() => ({}))) as { code?: string }
+      const { body, tooBig } = await readBody<{ code?: string }>(req, env)
+      if (tooBig) return TOO_BIG()
+      const code = body?.code
       if (!/^\d{6}$/.test(code ?? '')) return json({ error: 'bad code' }, 400)
-      const room = await env.PAIRING.get(env.PAIRING.idFromName('registry')).claim(code!)
+      if (!(await registry.spend(dailyCap))) return BUSY('daily limit reached, try again tomorrow')
+      const room = await registry.claim(code!)
       if (!room) return json({ error: 'unknown or expired code' }, 404)
       const glassesToken = await env.ROOMS.get(env.ROOMS.idFromName(room)).mintGlassesToken()
       return json({ room, glassesToken })
@@ -134,7 +165,12 @@ export default {
     const stub = env.ROOMS.get(env.ROOMS.idFromName(room))
 
     if (path === '/v1/pair/start' && req.method === 'POST') {
-      const code = await env.PAIRING.get(env.PAIRING.idFromName('registry')).start(room)
+      const ip = req.headers.get('CF-Connecting-IP') ?? 'unknown'
+      if (!(await registry.allowPairing(await sha256(ip), cap(env.PAIRS_PER_IP_HOUR)))) {
+        return BUSY('too many pairings from this address, try again within the hour')
+      }
+      if (!(await registry.spend(dailyCap))) return BUSY('daily limit reached, try again tomorrow')
+      const code = await registry.start(room)
       return json({ code, expires_in_s: PAIR_CODE_TTL_MS / 1000 })
     }
 
@@ -142,13 +178,16 @@ export default {
       if (!env.TELEGRAM_BOT_TOKEN) return json({ error: 'telegram not configured on this relay' }, 501)
       const me = await tg(env, 'getMe', {})
       if (!me?.ok) return json({ error: 'telegram bot unreachable' }, 502)
-      const code = await env.PAIRING.get(env.PAIRING.idFromName('registry')).startTelegram(room)
+      if (!(await registry.spend(dailyCap))) return BUSY('daily limit reached, try again tomorrow')
+      const code = await registry.startTelegram(room)
       return json({ link: `https://t.me/${me.result.username}?start=${code}`, bot: me.result.username })
     }
 
     if (path === '/v1/requests' && req.method === 'POST') {
-      const body = (await req.json().catch(() => null)) as Partial<NewRequest> | null
+      const { body, tooBig } = await readBody<Partial<NewRequest>>(req, env)
+      if (tooBig) return TOO_BIG()
       if (!body || !ID_RE.test(body.id ?? '')) return json({ error: 'bad request' }, 400)
+      if (!(await registry.spend(dailyCap))) return BUSY('daily limit reached, try again tomorrow')
       const card: CardRequest = {
         id: body.id!,
         session: clean(body.session, MAX.session),
@@ -169,11 +208,13 @@ export default {
           : {}),
         created_at: Date.now(),
       }
-      return json(await stub.add(card, clean(body.session_id, 80), clean(body.key, 64)))
+      const added = await stub.add(card, clean(body.session_id, 80), clean(body.key, 64))
+      return 'error' in added ? BUSY(added.error) : json(added)
     }
 
     if (path === '/v1/activity' && req.method === 'POST') {
-      const body = (await req.json().catch(() => null)) as Partial<Activity> | null
+      const { body, tooBig } = await readBody<Partial<Activity>>(req, env)
+      if (tooBig) return TOO_BIG()
       if (!body?.session_id || (body.event !== 'stop' && body.event !== 'tool_done')) {
         return json({ error: 'bad activity' }, 400)
       }
@@ -238,14 +279,51 @@ export class Room extends DurableObject<Env> {
   /** Telegram messages sent for pending cards, so they can be settled later. */
   private tgMsgs = new Map<string, { chat: number; message_id: number; html: string; word: string }>()
 
+  /** Last laptop or glasses activity, for expiring idle rooms (only when ROOM_IDLE_HOURS is set). */
+  private lastActive = Date.now()
+  private lastActiveSaved = 0
+  private readonly idleMs = cap(this.env.ROOM_IDLE_HOURS) * 3_600_000
+
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env)
     ctx.blockConcurrencyWhile(async () => {
       this.telegram = (await ctx.storage.get<Room['telegram']>('telegram')) ?? null
+      const saved = await ctx.storage.get<number>('lastActive')
+      if (saved) this.lastActive = this.lastActiveSaved = saved
     })
   }
 
+  /**
+   * Note activity. Saved at most every 10 minutes, so a busy room doesn't write
+   * on every poll; an evicted room may expire up to 10 minutes early.
+   */
+  private touch() {
+    if (this.idleMs === Infinity) return
+    this.lastActive = Date.now()
+    if (this.lastActive - this.lastActiveSaved < 10 * 60_000) return
+    this.lastActiveSaved = this.lastActive
+    void this.ctx.storage.put('lastActive', this.lastActive)
+    this.scheduleAlarm()
+  }
+
+  /** Forget the room: pairing, Telegram link, everything. The laptop has to pair again. */
+  private async expire() {
+    this.glasses?.close(4003, 'room expired after being idle')
+    this.glasses = null
+    for (const id of [...this.pending.keys()]) this.cancel(id)
+    this.decided.clear()
+    this.elsewhere.clear()
+    if (this.telegram) {
+      await this.env.PAIRING.get(this.env.PAIRING.idFromName('registry')).unlinkTelegram(this.telegram.user)
+      this.telegram = null
+    }
+    await this.ctx.storage.deleteAlarm()
+    await this.ctx.storage.deleteAll()
+    this.lastActiveSaved = 0
+  }
+
   async mintGlassesToken() {
+    this.touch()
     const t = randomToken()
     // One glasses client per laptop: a new pairing replaces the old one.
     await this.ctx.storage.put('glassesTokenHash', await sha256(t))
@@ -259,6 +337,7 @@ export class Room extends DurableObject<Env> {
     const token = new URL(req.url).searchParams.get('token') ?? ''
     const stored = await this.ctx.storage.get<string>('glassesTokenHash')
     if (!stored || (await sha256(token)) !== stored) return json({ error: 'not paired' }, 403)
+    this.touch()
 
     const [client, server] = Object.values(new WebSocketPair())
     server.accept()
@@ -293,6 +372,7 @@ export class Room extends DurableObject<Env> {
       return
     }
     if (msg.type !== 'verdict' || !this.pending.has(msg.id)) return
+    this.touch()
     if (msg.behavior !== 'allow' && msg.behavior !== 'deny') return
     const redirect = msg.behavior === 'deny' && msg.redirect ? clean(msg.redirect, 200) : undefined
     this.settle(msg.id, msg.behavior, redirect, 'glasses')
@@ -317,7 +397,9 @@ export class Room extends DurableObject<Env> {
     }
   }
 
-  async add(card: CardRequest, session_id = '', key = '') {
+  async add(card: CardRequest, session_id = '', key = ''): Promise<{ glasses: boolean } | { error: string }> {
+    this.touch()
+    if (this.pending.size >= cap(this.env.MAX_PENDING)) return { error: 'too many requests waiting in this room' }
     const cutoff = Date.now() - 10 * 60_000
     for (const [id, d] of this.decided) if (d.at < cutoff) this.decided.delete(id)
     for (const [id, at] of this.elsewhere) if (at < cutoff) this.elsewhere.delete(id)
@@ -329,6 +411,7 @@ export class Room extends DurableObject<Env> {
   }
 
   async poll(id: string): Promise<PollResult> {
+    this.touch()
     const d = this.decided.get(id)
     if (d) {
       this.decided.delete(id) // hand the verdict over once
@@ -344,6 +427,7 @@ export class Room extends DurableObject<Env> {
    * (Claude may run other tools in parallel); Stop clears the whole session.
    */
   async activity(session_id: string, event: 'tool_done' | 'stop', key = '') {
+    this.touch()
     const cleared: string[] = []
     for (const [id, m] of this.meta) {
       if (m.session_id !== session_id) continue
@@ -394,6 +478,7 @@ export class Room extends DurableObject<Env> {
     const t = this.telegram
     const from = u.message?.from?.id ?? u.callback_query?.from.id
     if (!t || from !== t.user) return false
+    this.touch()
 
     const q = u.callback_query
     if (q) {
@@ -493,12 +578,21 @@ export class Room extends DurableObject<Env> {
   }
 
   private scheduleTelegram() {
-    let next = Infinity
+    this.scheduleAlarm()
+  }
+
+  /** One alarm serves both jobs: the next Telegram send and idle expiry. */
+  private scheduleAlarm() {
+    let next = this.idleMs === Infinity || !this.lastActiveSaved ? Infinity : this.lastActive + this.idleMs
     for (const card of this.pending.values()) next = Math.min(next, this.telegramDue(card))
     if (next < Infinity) void this.ctx.storage.setAlarm(Math.max(next, Date.now() + 250))
   }
 
   async alarm() {
+    if (this.idleMs !== Infinity && this.lastActiveSaved && Date.now() >= this.lastActive + this.idleMs) {
+      await this.expire()
+      return
+    }
     await this.checkTelegram()
   }
 
@@ -558,6 +652,27 @@ export class Pairing extends DurableObject<Env> {
       return null
     }
     return entry.room
+  }
+
+  /** Pairings per hashed IP in the last hour. Kept in storage so eviction doesn't reset it. */
+  async allowPairing(ipHash: string, perHour: number) {
+    if (perHour === Infinity) return true
+    const key = `ip:${ipHash}`
+    const now = Date.now()
+    const recent = ((await this.ctx.storage.get<number[]>(key)) ?? []).filter(t => now - t < 3_600_000)
+    if (recent.length >= perHour) return false
+    await this.ctx.storage.put(key, [...recent, now])
+    return true
+  }
+
+  /** Count one new request or pairing against the day's cap (UTC). */
+  async spend(daily: number) {
+    if (daily === Infinity) return true
+    const key = `day:${new Date().toISOString().slice(0, 10)}`
+    const used = (await this.ctx.storage.get<number>(key)) ?? 0
+    if (used >= daily) return false
+    await this.ctx.storage.put(key, used + 1)
+    return true
   }
 
   // Telegram links use long random codes, so they don't need the failure cap.
