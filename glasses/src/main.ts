@@ -6,7 +6,17 @@ import {
   OsEventTypeList,
 } from '@evenrealities/even_hub_sdk'
 import type { CardRequest, FromGlasses, ToGlasses } from '../../shared/protocol'
-import { renderCard, renderIdle, type Status } from './render'
+import {
+  feedApprove,
+  feedPicker,
+  redirectsFor,
+  startApprove,
+  type ApproveState,
+  type Gesture,
+  type PickerState,
+  type Sequence,
+} from '../../shared/confirm'
+import { renderCard, renderIdle, renderPicker, type Status } from './render'
 
 type Pairing = { relay: string; room: string; token: string }
 
@@ -39,15 +49,41 @@ let flashTimer: ReturnType<typeof setTimeout> | undefined
 // A card ignores gestures for its first moments on screen, so a tap meant for
 // something else (or a stray input) can't answer a request nobody has read.
 const ARM_MS = 800
-let shownId: string | undefined
+// Without a choice, the redirect picker sends a plain deny after this long.
+const PICKER_MS = 20_000
+
+type View =
+  | { mode: 'approve'; id: string; state: ApproveState; variant: number }
+  | { mode: 'picker'; id: string; state: PickerState }
+let view: View | null = null
 let shownAt = 0
+let lastSequence: Sequence | undefined
+let pickerTimer: ReturnType<typeof setTimeout> | undefined
+let cardsShown = 0
+
+/** Keep the view in step with the card at the front of the queue. */
+function syncView() {
+  const card = cards[0]
+  if (!card) {
+    view = null
+    return
+  }
+  if (view?.id === card.id) return
+  clearTimeout(pickerTimer)
+  const state = startApprove(card.tier, lastSequence)
+  if (state.sequence) lastSequence = state.sequence
+  view = { mode: 'approve', id: card.id, state, variant: cardsShown++ }
+  shownAt = Date.now()
+  console.log('breakpoint: card', `T${card.tier}`, card.label, state.sequence?.text ?? 'tap')
+}
 
 function draw() {
-  if (cards[0]?.id !== shownId) {
-    shownId = cards[0]?.id
-    shownAt = Date.now()
-  }
-  const content = cards.length ? renderCard(cards[0], 0, cards.length) : renderIdle(status, flash)
+  syncView()
+  const card = cards[0]
+  let content: string
+  if (!card || !view) content = renderIdle(status, flash)
+  else if (view.mode === 'picker') content = renderPicker(card, view.state)
+  else content = renderCard(card, 0, cards.length, view.state, view.variant)
   bridge.textContainerUpgrade(new TextContainerUpgrade({ containerID: 1, containerName: 'main', content }))
 }
 
@@ -78,8 +114,16 @@ function connect(p: Pairing) {
   }
   sock.onmessage = ev => {
     const msg = JSON.parse(String(ev.data)) as ToGlasses
-    if (msg.type === 'snapshot') cards = msg.requests
-    if (msg.type === 'add') cards = [...cards.filter(c => c.id !== msg.request.id), msg.request]
+    // Destructive requests jump the queue: they interrupt now.
+    const order = (list: CardRequest[]) => [...list].sort((a, b) => (b.tier === 3 ? 1 : 0) - (a.tier === 3 ? 1 : 0))
+    if (msg.type === 'snapshot') cards = order(msg.requests)
+    if (msg.type === 'add') {
+      const rest = cards.filter(c => c.id !== msg.request.id)
+      // Never pull a card out from under the wearer mid-gesture: a new T3 goes
+      // to the front only if the current card isn't being answered.
+      const busy = view && (view.mode === 'picker' || (view.mode === 'approve' && view.state.progress > 0))
+      cards = msg.request.tier === 3 && !busy && rest[0]?.tier !== 3 ? [msg.request, ...rest] : [...rest, msg.request]
+    }
     if (msg.type === 'remove') {
       const wasShown = cards[0]?.id === msg.id
       cards = cards.filter(c => c.id !== msg.id)
@@ -100,18 +144,49 @@ function connect(p: Pairing) {
   }
 }
 
-function answer(behavior: 'allow' | 'deny') {
+function send(behavior: 'allow' | 'deny', redirect?: string) {
   const card = cards[0]
   if (!card || !ws || ws.readyState !== WebSocket.OPEN) return
+  const msg: FromGlasses = { type: 'verdict', id: card.id, behavior, ...(redirect ? { redirect } : {}) }
+  ws.send(JSON.stringify(msg))
+  console.log('breakpoint: verdict', behavior, redirect ?? '')
+  clearTimeout(pickerTimer)
+  cards = cards.slice(1)
+  showFlash(behavior === 'allow' ? 'Allowed' : redirect ? 'Denied, reply sent' : 'Denied')
+  draw()
+}
+
+function onGesture(g: Gesture) {
+  const card = cards[0]
+  if (!card || !view) return
   if (Date.now() - shownAt < ARM_MS) {
     console.log('breakpoint: ignored input, card not armed yet')
     return
   }
-  const msg: FromGlasses = { type: 'verdict', id: card.id, behavior }
-  ws.send(JSON.stringify(msg))
-  cards = cards.slice(1)
-  showFlash(behavior === 'allow' ? 'Allowed' : 'Denied')
-  draw()
+  if (view.mode === 'picker') {
+    const r = feedPicker(view.state, g)
+    if (r.kind === 'send') send('deny', r.redirect)
+    else if (r.kind === 'plain') send('deny')
+    else if (r.kind === 'move') {
+      view = { ...view, state: r.state }
+      draw()
+    }
+    return
+  }
+  const r = feedApprove(view.state, g, Date.now())
+  if (r.kind === 'approve') send('allow')
+  else if (r.kind === 'deny') {
+    view = { mode: 'picker', id: card.id, state: { options: redirectsFor(card, card.preview), index: 0 } }
+    shownAt = Date.now()
+    clearTimeout(pickerTimer)
+    pickerTimer = setTimeout(() => send('deny'), PICKER_MS)
+    draw()
+  } else if (r.kind === 'progress' || r.kind === 'wrong') {
+    if (r.kind === 'wrong') console.log('breakpoint: wrong gesture, new sequence', r.state.sequence?.text)
+    if (r.state.sequence) lastSequence = r.state.sequence
+    view = { ...view, state: r.state }
+    draw()
+  }
 }
 
 // --- Gestures --------------------------------------------------------------------
@@ -122,12 +197,19 @@ function typeOf(envelope?: { eventType?: OsEventTypeList }): OsEventTypeList | n
   return envelope.eventType ?? OsEventTypeList.CLICK_EVENT
 }
 
+const GESTURES: Partial<Record<OsEventTypeList, Gesture>> = {
+  [OsEventTypeList.CLICK_EVENT]: 'tap',
+  [OsEventTypeList.DOUBLE_CLICK_EVENT]: 'double',
+  [OsEventTypeList.SCROLL_TOP_EVENT]: 'up',
+  [OsEventTypeList.SCROLL_BOTTOM_EVENT]: 'down',
+  [OsEventTypeList.LONG_PRESS_EVENT]: 'hold',
+}
+
 bridge.onEvenHubEvent(event => {
   const type = typeOf(event.textEvent) ?? typeOf(event.sysEvent)
-  if (type === OsEventTypeList.CLICK_EVENT) answer('allow')
-  else if (type === OsEventTypeList.SCROLL_BOTTOM_EVENT) answer('deny')
-  // Exit gesture deliberately unbound until the confirm-gesture set is settled:
-  // a stray double tap closing the app would hide every later prompt.
+  const g = type === null ? undefined : GESTURES[type]
+  if (g) onGesture(g)
+  // No exit gesture: a stray double tap closing the app would hide every later prompt.
 })
 
 // --- Pairing (phone screen) --------------------------------------------------------
