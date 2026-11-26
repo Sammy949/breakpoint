@@ -121,8 +121,11 @@ case "${1:-}" in
     mkdir -p "$DEMO_DIR"
     (cd "$REPO/glasses" && nohup bun run dev > "$DEMO_DIR/glasses-dev.log" 2>&1 &)
     sleep 3
-    echo "Glasses app on http://localhost:5180 (log: $DEMO_DIR/glasses-dev.log). Starting the simulator."
-    exec evenhub-simulator "http://localhost:5180/?relay=$relay&code=$code" --automation-port 9898
+    echo "Glasses app on http://localhost:5180 (log: $DEMO_DIR/glasses-dev.log)."
+    # The simulator is noisy under WSL (no GPU driver, no sound card), all harmless.
+    echo "Simulator running (log: $DEMO_DIR/simulator.log). Ctrl-C stops it."
+    exec evenhub-simulator "http://localhost:5180/?relay=$relay&code=$code" --automation-port 9898 \
+      > "$DEMO_DIR/simulator.log" 2>&1
     ;;
   telegram)
     bun "$REPO/scripts/telegram.ts" link
