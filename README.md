@@ -75,6 +75,8 @@ bun scripts/setup.ts /path/to/your/project --ask
 
 This writes Breakpoint's hooks into the project's `.claude/settings.local.json`, which stays on your machine. `--ask` also adds `ask` rules for risky commands (`rm`, `git push`, `npm install` and a few more) so they prompt even in auto mode. Start Claude Code in that project and ask it to run `rm -rf some-folder`. The card appears in the simulator.
 
+**Or let the demo script do it.** `scripts/demo.sh` wraps all of this: `pair`, `sim <code>`, `telegram`, and `project`, which builds a throwaway project whose "origin" is a local bare repo, so the force push never leaves your machine. Then `demo.sh claude <scene>` starts Claude Code in tmux with a prompt that triggers one kind of request (`batch`, `install`, `force-push`, `delete` or `plan`). `demo.sh cards <scene>` posts the same requests without Claude, which costs nothing and is good for rehearsing.
+
 To check the relay on its own, `bun scripts/relay-smoke.ts <relay-url>` plays both laptop and glasses and runs through pairing, verdicts and isolation between laptops.
 
 ### Telegram (optional)
