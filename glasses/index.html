@@ -31,6 +31,10 @@
         background: #E5E5E5; color: #232323; border: 0; border-radius: 8px;
       }
       #pair-status { margin-top: 16px; min-height: 1.4em; color: #E5E5E5; }
+      fieldset { margin-top: 28px; border: 1px solid #555; border-radius: 8px; padding: 12px 16px 16px; }
+      legend { font-weight: 600; padding: 0 6px; }
+      fieldset label { display: flex; align-items: center; gap: 10px; min-height: 44px; margin: 0; font-weight: 400; }
+      fieldset input { width: 20px; height: 20px; }
     </style>
   </head>
   <body>
@@ -45,6 +49,13 @@
         <button type="submit">Pair</button>
       </form>
       <p id="pair-status" role="status"></p>
+      <fieldset>
+        <legend>Attention (for demos)</legend>
+        <p>Auto waits for a break when you're talking or moving. Busy and Free force it.</p>
+        <label><input type="radio" name="attention" value="auto" checked /> Auto</label>
+        <label><input type="radio" name="attention" value="busy" /> Busy</label>
+        <label><input type="radio" name="attention" value="free" /> Free</label>
+      </fieldset>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

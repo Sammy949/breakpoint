@@ -73,8 +73,14 @@ export function renderPicker(card: CardRequest, picker: PickerState) {
 
 export type Status = 'unpaired' | 'connecting' | 'connected' | 'offline'
 
-export function renderIdle(status: Status, flash?: string) {
+const WHY: Record<string, string> = { talking: "you're talking", moving: "you're moving", forced: 'busy mode is on' }
+
+export function renderIdle(status: Status, flash?: string, waiting?: { count: number; reason: string | null }) {
   const top = flash ?? 'Breakpoint'
+  if (status === 'connected' && waiting && waiting.count > 0) {
+    const n = waiting.count === 1 ? '1 request' : `${waiting.count} requests`
+    return `${top}\n\n${n} waiting for a break${waiting.reason ? ` (${WHY[waiting.reason] ?? waiting.reason})` : ''}.\nDestructive ones still interrupt.`
+  }
   switch (status) {
     case 'unpaired':
       return `${top}\n\nNot paired yet.\nOpen Breakpoint on your phone to pair.`

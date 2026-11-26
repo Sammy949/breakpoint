@@ -4,7 +4,9 @@ import {
   CreateStartUpPageContainer,
   TextContainerUpgrade,
   OsEventTypeList,
+  AudioInputSource,
 } from '@evenrealities/even_hub_sdk'
+import { Attention, due, type Override } from '../../shared/attention'
 import type { CardRequest, FromGlasses, ToGlasses } from '../../shared/protocol'
 import {
   feedApprove,
@@ -42,7 +44,11 @@ const created = await bridge.createStartUpPageContainer(
 console.log('breakpoint: page created', created === 0 ? 'ok' : `failed (${created})`)
 
 let status: Status = 'connecting'
+/** Every waiting request, most urgent first. Not all of them are due yet. */
 let cards: CardRequest[] = []
+/** When each card reached the phone (local clock, so relay clock skew doesn't matter). */
+const arrived = new Map<string, number>()
+const attention = new Attention()
 let flash: string | undefined
 let flashTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -61,9 +67,30 @@ let lastSequence: Sequence | undefined
 let pickerTimer: ReturnType<typeof setTimeout> | undefined
 let cardsShown = 0
 
-/** Keep the view in step with the card at the front of the queue. */
+/** Cards that may be on screen now, given whether the wearer is busy. */
+function dueCards(now = Date.now()) {
+  const busy = attention.busy(now) !== null
+  return cards.filter(c => due(c, arrived.get(c.id) ?? now, now, busy))
+}
+
+/**
+ * The card to show. A card already on screen stays there (it has already
+ * interrupted, and shouldn't vanish because you started talking), except that
+ * a destructive card may take over one you haven't started answering.
+ */
+function front(): CardRequest | undefined {
+  const current = view ? cards.find(c => c.id === view!.id) : undefined
+  if (current && view) {
+    const engaged = view.mode === 'picker' || view.state.progress > 0
+    if (engaged || current.tier === 3) return current
+    return dueCards().find(c => c.tier === 3) ?? current
+  }
+  return dueCards()[0]
+}
+
+/** Keep the view in step with the card on screen. */
 function syncView() {
-  const card = cards[0]
+  const card = front()
   if (!card) {
     view = null
     return
@@ -77,16 +104,26 @@ function syncView() {
   console.log('breakpoint: card', `T${card.tier}`, card.label, state.sequence?.text ?? 'tap')
 }
 
+let lastContent = ''
+
 function draw() {
   syncView()
-  const card = cards[0]
+  const card = front()
+  const showing = dueCards().length
   let content: string
-  if (!card || !view) content = renderIdle(status, flash)
-  else if (view.mode === 'picker') content = renderPicker(card, view.state)
-  else if (card.kind === 'plan') content = renderPlan(card, 0, cards.length)
-  else content = renderCard(card, 0, cards.length, view.state, view.variant)
+  if (!card || !view) {
+    const held = cards.length - showing
+    content = renderIdle(status, flash, held > 0 ? { count: held, reason: attention.busy(Date.now()) } : undefined)
+  } else if (view.mode === 'picker') content = renderPicker(card, view.state)
+  else if (card.kind === 'plan') content = renderPlan(card, 0, showing)
+  else content = renderCard(card, 0, showing, view.state, view.variant)
+  if (content === lastContent) return // the display link is slow; skip no-op redraws
+  lastContent = content
   bridge.textContainerUpgrade(new TextContainerUpgrade({ containerID: 1, containerName: 'main', content }))
 }
+
+// Cards become due as time passes or the wearer stops talking, so re-check every second.
+setInterval(draw, 1000)
 
 function showFlash(text: string) {
   flash = text
@@ -117,8 +154,13 @@ function connect(p: Pairing) {
     const msg = JSON.parse(String(ev.data)) as ToGlasses
     // Destructive requests jump the queue: they interrupt now.
     const order = (list: CardRequest[]) => [...list].sort((a, b) => (b.tier === 3 ? 1 : 0) - (a.tier === 3 ? 1 : 0))
-    if (msg.type === 'snapshot') cards = order(msg.requests)
+    const now = Date.now()
+    if (msg.type === 'snapshot') {
+      cards = order(msg.requests)
+      for (const c of cards) if (!arrived.has(c.id)) arrived.set(c.id, now)
+    }
     if (msg.type === 'add') {
+      arrived.set(msg.request.id, now)
       const rest = cards.filter(c => c.id !== msg.request.id)
       // Never pull a card out from under the wearer mid-gesture: a new T3 goes
       // to the front only if the current card isn't being answered.
@@ -126,8 +168,9 @@ function connect(p: Pairing) {
       cards = msg.request.tier === 3 && !busy && rest[0]?.tier !== 3 ? [msg.request, ...rest] : [...rest, msg.request]
     }
     if (msg.type === 'remove') {
-      const wasShown = cards[0]?.id === msg.id
+      const wasShown = view?.id === msg.id
       cards = cards.filter(c => c.id !== msg.id)
+      arrived.delete(msg.id)
       if (wasShown && msg.reason === 'elsewhere') showFlash('Answered at the desk')
       if (wasShown && msg.reason === 'cancelled') showFlash('Timed out. Answer in the terminal.')
     }
@@ -146,13 +189,14 @@ function connect(p: Pairing) {
 }
 
 function send(behavior: 'allow' | 'deny', redirect?: string) {
-  const card = cards[0]
+  const card = front()
   if (!card || !ws || ws.readyState !== WebSocket.OPEN) return
   const msg: FromGlasses = { type: 'verdict', id: card.id, behavior, ...(redirect ? { redirect } : {}) }
   ws.send(JSON.stringify(msg))
   console.log('breakpoint: verdict', behavior, redirect ?? '')
   clearTimeout(pickerTimer)
-  cards = cards.slice(1)
+  cards = cards.filter(c => c.id !== card.id)
+  arrived.delete(card.id)
   const plan = card.kind === 'plan'
   showFlash(
     behavior === 'allow'
@@ -163,7 +207,7 @@ function send(behavior: 'allow' | 'deny', redirect?: string) {
 }
 
 function onGesture(g: Gesture) {
-  const card = cards[0]
+  const card = front()
   if (!card || !view) return
   if (Date.now() - shownAt < ARM_MS) {
     console.log('breakpoint: ignored input, card not armed yet')
@@ -212,11 +256,48 @@ const GESTURES: Partial<Record<OsEventTypeList, Gesture>> = {
 }
 
 bridge.onEvenHubEvent(event => {
+  const now = Date.now()
+  // Microphone frames: reduced to a loudness number here, never sent anywhere.
+  if (event.audioEvent?.audioPcm) {
+    attention.noteAudio(event.audioEvent.audioPcm as Uint8Array | number[] | string, now)
+    return
+  }
+  const imu = event.sysEvent?.imuData
+  if (event.sysEvent?.eventType === OsEventTypeList.IMU_DATA_REPORT && imu) {
+    attention.noteImu(imu.x ?? 0, imu.y ?? 0, imu.z ?? 0, now)
+    return
+  }
   const type = typeOf(event.textEvent) ?? typeOf(event.sysEvent)
   const g = type === null ? undefined : GESTURES[type]
   if (g) onGesture(g)
   // No exit gesture: a stray double tap closing the app would hide every later prompt.
 })
+
+// --- Attention inputs ----------------------------------------------------------------
+// The glasses mic needs the startup page to exist first (it does by now).
+bridge
+  .audioControl(true, AudioInputSource.Glasses)
+  .then(ok => console.log('breakpoint: mic', ok ? 'on' : 'unavailable'))
+  .catch(() => console.log('breakpoint: mic unavailable'))
+bridge
+  .imuControl(true)
+  .then(ok => console.log('breakpoint: imu', ok ? 'on' : 'unavailable'))
+  .catch(() => console.log('breakpoint: imu unavailable'))
+
+// Debug toggle on the phone screen (and ?attention=busy|free) to force the
+// scheduler for demos, since the simulator can't produce real movement.
+function setOverride(mode: Override) {
+  attention.override = mode
+  const radio = document.querySelector<HTMLInputElement>(`input[name="attention"][value="${mode}"]`)
+  if (radio) radio.checked = true
+  console.log('breakpoint: attention override', mode)
+  draw()
+}
+document.querySelectorAll<HTMLInputElement>('input[name="attention"]').forEach(r =>
+  r.addEventListener('change', () => setOverride(r.value as Override)),
+)
+const forced = new URLSearchParams(location.search).get('attention')
+if (forced === 'busy' || forced === 'free') setOverride(forced)
 
 // --- Pairing (phone screen) --------------------------------------------------------
 const form = document.querySelector<HTMLFormElement>('#pair')!

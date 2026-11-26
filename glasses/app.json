@@ -5,7 +5,12 @@
   "version": "0.1.0",
   "min_sdk_version": "0.0.16",
   "entrypoint": "index.html",
-  "permissions": [],
+  "permissions": [
+    {
+      "name": "g2-microphone",
+      "desc": "Listens for speech near you so non-urgent requests wait until you're not in a conversation. Audio is reduced to a loudness level on your phone and never sent anywhere."
+    }
+  ],
   "supported_languages": [
     "en"
   ]
