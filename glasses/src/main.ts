@@ -18,7 +18,7 @@ import {
   type PickerState,
   type Sequence,
 } from '../../shared/confirm'
-import { renderCard, renderIdle, renderPicker, renderPlan, type Status } from './render'
+import { renderBatch, renderCard, renderIdle, renderPicker, renderPlan, type Status } from './render'
 
 type Pairing = { relay: string; room: string; token: string }
 
@@ -61,7 +61,11 @@ const PICKER_MS = 20_000
 type View =
   | { mode: 'approve'; id: string; state: ApproveState; variant: number }
   | { mode: 'picker'; id: string; state: PickerState }
+  /** Several local (T1) requests answered together with a long press. */
+  | { mode: 'batch'; id: string; ids: string[] }
 let view: View | null = null
+/** The wearer swiped down on a batch and is going through it one by one. */
+let reviewing = false
 let shownAt = 0
 let lastSequence: Sequence | undefined
 let pickerTimer: ReturnType<typeof setTimeout> | undefined
@@ -81,7 +85,7 @@ function dueCards(now = Date.now()) {
 function front(): CardRequest | undefined {
   const current = view ? cards.find(c => c.id === view!.id) : undefined
   if (current && view) {
-    const engaged = view.mode === 'picker' || view.state.progress > 0
+    const engaged = view.mode === 'picker' || view.mode === 'batch' || view.state.progress > 0
     if (engaged || current.tier === 3) return current
     return dueCards().find(c => c.tier === 3) ?? current
   }
@@ -89,13 +93,29 @@ function front(): CardRequest | undefined {
 }
 
 /** Keep the view in step with the card on screen. */
+const isLocal = (c: CardRequest) => c.tier === 1 && c.kind !== 'plan'
+
 function syncView() {
   const card = front()
   if (!card) {
     view = null
+    reviewing = false
     return
   }
-  if (view?.id === card.id) return
+  if (!isLocal(card)) reviewing = false
+
+  // Two or more local requests due at once: one batch card.
+  const batch = isLocal(card) && !reviewing ? dueCards().filter(isLocal) : []
+  if (batch.length > 1) {
+    const ids = batch.map(c => c.id)
+    if (view?.mode === 'batch' && view.ids.join() === ids.join()) return
+    // Re-arm whenever the list changes, so "approve all" only covers what was on screen.
+    view = { mode: 'batch', id: ids[0], ids }
+    shownAt = Date.now()
+    console.log('breakpoint: batch', ids.length)
+    return
+  }
+  if (view?.id === card.id && view.mode !== 'batch') return
   clearTimeout(pickerTimer)
   const state = startApprove(card.tier, lastSequence)
   if (state.sequence) lastSequence = state.sequence
@@ -114,6 +134,9 @@ function draw() {
   if (!card || !view) {
     const held = cards.length - showing
     content = renderIdle(status, flash, held > 0 ? { count: held, reason: attention.busy(Date.now()) } : undefined)
+  } else if (view.mode === 'batch') {
+    const ids = view.ids
+    content = renderBatch(cards.filter(c => ids.includes(c.id)))
   } else if (view.mode === 'picker') content = renderPicker(card, view.state)
   else if (card.kind === 'plan') content = renderPlan(card, 0, showing)
   else content = renderCard(card, 0, showing, view.state, view.variant)
@@ -188,15 +211,20 @@ function connect(p: Pairing) {
   }
 }
 
-function send(behavior: 'allow' | 'deny', redirect?: string) {
-  const card = front()
-  if (!card || !ws || ws.readyState !== WebSocket.OPEN) return
+function sendVerdict(card: CardRequest, behavior: 'allow' | 'deny', redirect?: string) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return false
   const msg: FromGlasses = { type: 'verdict', id: card.id, behavior, ...(redirect ? { redirect } : {}) }
   ws.send(JSON.stringify(msg))
   console.log('breakpoint: verdict', behavior, redirect ?? '')
-  clearTimeout(pickerTimer)
   cards = cards.filter(c => c.id !== card.id)
   arrived.delete(card.id)
+  return true
+}
+
+function send(behavior: 'allow' | 'deny', redirect?: string) {
+  const card = front()
+  if (!card || !sendVerdict(card, behavior, redirect)) return
+  clearTimeout(pickerTimer)
   const plan = card.kind === 'plan'
   showFlash(
     behavior === 'allow'
@@ -211,6 +239,20 @@ function onGesture(g: Gesture) {
   if (!card || !view) return
   if (Date.now() - shownAt < ARM_MS) {
     console.log('breakpoint: ignored input, card not armed yet')
+    return
+  }
+  if (view.mode === 'batch') {
+    if (g === 'hold') {
+      const batch = cards.filter(c => view!.mode === 'batch' && view!.ids.includes(c.id))
+      for (const c of batch) sendVerdict(c, 'allow')
+      showFlash(`Approved ${batch.length} safe requests`)
+      view = null
+      draw()
+    } else if (g === 'down') {
+      reviewing = true
+      view = null
+      draw()
+    }
     return
   }
   if (view.mode === 'picker') {

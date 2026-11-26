@@ -60,6 +60,19 @@ export function renderPlan(card: CardRequest, index: number, total: number) {
   ].join('\n')
 }
 
+export function renderBatch(cards: CardRequest[]) {
+  const sessions = [...new Set(cards.map(c => c.session || 'session'))]
+  const who = sessions.length === 1 ? oneLine(sessions[0], 20) : `${sessions.length} sessions`
+  const shown = cards.slice(0, 4).map(c => `- ${oneLine(c.preview, LINE - 2)}`)
+  if (cards.length > 4) shown.push(`  and ${cards.length - 4} more`)
+  return [
+    `${who} · ${cards.length} safe requests waiting`,
+    ...shown,
+    '',
+    'HOLD: approve all · SWIPE DOWN: one by one',
+  ].join('\n')
+}
+
 export function renderPicker(card: CardRequest, picker: PickerState) {
   return [
     `${oneLine(card.session || 'session', 20)} · ${card.kind === 'plan' ? 'plan feedback' : 'denying'}`,
