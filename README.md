@@ -35,7 +35,7 @@ No AI decides anything on your approvals. Rules classify, you decide.
 
   Saying no is always the same: swipe down. A wrong approve gesture switches to a different sequence, so approving a destructive command can't become muscle memory.
 - **Waits for a natural break.** *(working in the simulator with a busy toggle; voice and motion detection are built and unit-tested but not yet tried on real glasses)* If someone is talking near you or you're moving, non-urgent requests wait. Destructive ones still interrupt, outside-effect ones wait at most a minute, and local ones at most four minutes, so a trivial edit never stalls Claude through a long meeting. How loud the microphone is gets worked out on your phone, and the audio itself never leaves it. This is a simple, rule-based take on attention-sensitive alerting, not a model of your attention.
-- **Telegram as a second surface.** *(planned)* If the glasses app isn't open, the request goes to your Telegram instead. Every destructive decision posts a receipt to a channel you pick.
+- **Telegram as a second surface.** *(working)* If the glasses app has been closed for 20 seconds, requests go to your Telegram instead, and a destructive request nobody answers on the glasses within 3 minutes goes there too. The first answer wins and the other copy updates itself. Normal requests get Allow, the same canned replies and Deny as buttons. Destructive ones get no Allow button: you approve by sending the word the message shows, such as the branch name. Every destructive decision posts a receipt to your chat, or to a channel you pick. Only the Telegram account you linked can answer.
 
 ## Try what works today
 
@@ -77,6 +77,17 @@ This writes Breakpoint's hooks into the project's `.claude/settings.local.json`,
 
 To check the relay on its own, `bun scripts/relay-smoke.ts <relay-url>` plays both laptop and glasses and runs through pairing, verdicts and isolation between laptops.
 
+### Telegram (optional)
+
+Create a bot with [@BotFather](https://t.me/BotFather) and put its token in `.env` as `TELEGRAM_BOT_TOKEN` (see `.env.example`). Then, with the relay running:
+
+```bash
+bun scripts/telegram.ts webhook https://<your-relay-url>   # points the bot at the relay
+bun scripts/telegram.ts link                                # prints a link: open it on your phone and tap Start
+```
+
+For a local relay, `webhook` also writes the token to `relay/.dev.vars` (gitignored), so restart `bun run dev` after it. Telegram has to reach the relay, so a local one needs the quick tunnel.
+
 ### Deploying your own relay
 
 A quick tunnel's URL changes every run. For a lasting one, deploy the relay to your own Cloudflare account:
@@ -85,13 +96,14 @@ A quick tunnel's URL changes every run. For a lasting one, deploy the relay to y
 cd relay && bun run deploy
 ```
 
-Pair against the `workers.dev` URL it prints. To install the app on real glasses, put that URL in `glasses/.env` as `VITE_BREAKPOINT_RELAY` (see `.env.example`) and run `bun run pack` in `glasses/`, which adds the relay to the app's network allowlist. A relay for judges will be linked from the submission page.
+Pair against the `workers.dev` URL it prints. For Telegram, also run `bunx wrangler secret put TELEGRAM_BOT_TOKEN` in `relay/`. To install the app on real glasses, put that URL in `glasses/.env` as `VITE_BREAKPOINT_RELAY` (see `.env.example`) and run `bun run pack` in `glasses/`, which adds the relay to the app's network allowlist. A relay for judges will be linked from the submission page.
 
 ## Privacy
 
 - No account, no telemetry, no analytics.
-- The relay passes messages between your laptop and your phone. Waiting requests are held in memory and never written to disk. The only thing it stores is a hash of your glasses' pairing token.
+- The relay passes messages between your laptop and your phone. Waiting requests are held in memory and never written to disk. Without Telegram, the only thing it stores is a hash of your glasses' pairing token.
 - Only a one-line preview of the command or file path, Claude's description of it, and the project folder name leave the laptop. For plans, that's the title and up to three steps. The relay strips control characters and caps their length before they reach the glasses.
+- **If you link Telegram,** each request sent there and each destructive receipt (the same preview, session name and outcome) passes through Telegram's servers. The relay stores your Telegram user ID, chat ID and receipt channel, if you set one, to know where to send them and whose answers count. `/stop` deletes them.
 - Your laptop's relay token is saved in `~/.config/breakpoint/config.json`, outside the repo.
 
 ## Why hooks and not channels
@@ -103,12 +115,12 @@ Claude Code has a research-preview feature called channels, which can also relay
 ## Next
 
 - **Tell your own voice from a meeting around you.** The glasses tag each audio frame as you, someone else or unknown. That could separate "I'm talking" from "a conversation is happening near me", which deserve different waits.
-- **Telegram as a second surface** and team policies.
+- **Team policies:** shared rules for which commands count as destructive, and receipts to a team channel.
 
 ## Limitations
 
 - **Tested in the Even Hub simulator, not yet on G2 hardware.** The app's network allowlist lists the relay under both `https://` and `wss://`, because the docs don't say whether WebSockets need their own entry. That's unproven on a real device.
-- **The glasses app only works while it's open.** Even Hub plugins can't run in the background, so a closed app can't show a card. The terminal dialog still works, and Telegram fallback is planned for this.
+- **The glasses app only works while it's open.** Even Hub plugins can't run in the background, so a closed app can't show a card. The terminal dialog still works, and requests fall back to Telegram if you've linked it.
 - **Waiting requests live in the relay's memory.** If Cloudflare restarts it, they're lost. The hook then steps aside and the terminal dialog decides, so nothing is approved by accident.
 - **Requests don't wait forever.** If nobody answers within 29 minutes, the hook withdraws the card and steps aside, and the terminal dialog decides. `setup.ts` sets Claude Code's hook timeout to 30 minutes and the hook's own deadline a minute earlier, so the hook always ends on its own terms.
 - **Pairing is rate-limited globally,** not per person, so someone guessing codes could block new pairings for a minute.
