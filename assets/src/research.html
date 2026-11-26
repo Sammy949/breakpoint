@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Video research card, 1920×1080</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  body { width: 1920px; height: 1080px; padding: 120px 140px 96px; display: flex; flex-direction: column; }
+  h1 { font-size: 72px; line-height: 1.1; margin-bottom: 96px; }
+  .cols { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 64px; align-content: start; }
+  article { border-top: 2px solid var(--phosphor); padding-top: 32px; display: flex; flex-direction: column; }
+  cite { font-style: italic; font-size: 24px; color: var(--ink-3); margin-bottom: 28px; }
+  .finding { font-size: 36px; line-height: 1.3; font-weight: 500; margin-bottom: 36px; }
+  .feature { font-size: 28px; line-height: 1.4; color: var(--ink-2); }
+  .feature::before { content: "→ "; color: var(--phosphor); }
+  footer { font-size: 26px; color: var(--ink-3); }
+</style>
+</head>
+<body>
+  <h1>Every feature traces to a finding.</h1>
+  <div class="cols">
+    <article>
+      <cite>Horvitz et al., Microsoft Research, 1999</cite>
+      <p class="finding">Weigh the cost of waiting against the cost of interrupting.</p>
+      <p class="feature">Risk tiers decide which requests interrupt and which wait.</p>
+    </article>
+    <article>
+      <cite>Iqbal &amp; Bailey, 2005–2007</cite>
+      <p class="finding">Interruptions cost least at natural breaks in a task.</p>
+      <p class="feature">Safe requests wait until you stop talking or moving.</p>
+    </article>
+    <article>
+      <cite>Vance, Anderson et al., BYU, 2015–2018</cite>
+      <p class="finding">Repeated warnings get ignored. Warnings that change don't.</p>
+      <p class="feature">The approve gesture for destructive commands changes every time.</p>
+    </article>
+  </div>
+  <footer>Informed by this research, not a replication of it.</footer>
+</body>
+</html>

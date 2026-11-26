@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Scenes, 1920×1080</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  body { width: 1920px; height: 1080px; padding: 110px 140px 80px; display: flex; flex-direction: column; }
+  h1 { font-size: 64px; line-height: 1.1; margin-bottom: 72px; }
+  .panels { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 48px; }
+  .panel { display: flex; flex-direction: column; }
+  .art { position: relative; height: 560px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .art svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .art svg * { fill: none; stroke: var(--phosphor); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+  .art svg .dim { opacity: .4; }
+  .card {
+    position: absolute; left: 32px; right: 32px; top: 32px;
+    background: #000; border: 1px solid var(--line); border-radius: 8px;
+    padding: 18px 20px; font-family: "JetBrains Mono", monospace; font-weight: 700;
+    color: var(--phosphor); font-size: 19px; line-height: 1.45;
+  }
+  .card .quiet { opacity: .7; }
+  .caption { margin-top: 28px; font-size: 32px; font-weight: 500; }
+  footer { margin-top: 32px; font-size: 22px; color: var(--ink-3); }
+</style>
+</head>
+<body>
+  <h1>Claude keeps working. You don't have to stay at the desk.</h1>
+  <div class="panels">
+    <section class="panel">
+      <div class="art">
+        <svg viewBox="0 0 520 560" aria-hidden="true">
+          <!-- desk and laptop left running -->
+          <path d="M40 420h220M60 420v100M240 420v100"/>
+          <path d="M90 420l12-110h116l12 110"/>
+          <path class="dim" d="M118 336h60M118 356h80M118 376h44"/>
+          <!-- person walking away -->
+          <circle cx="400" cy="250" r="26"/>
+          <path d="M400 276v120"/>
+          <path d="M400 300l-34 52M400 300l30 48"/>
+          <path d="M400 396l-36 92M400 396l34 92"/>
+          <path class="dim" d="M300 470h40M290 490h30"/>
+        </svg>
+      </div>
+      <p class="caption">You step away</p>
+    </section>
+    <section class="panel">
+      <div class="art">
+        <svg viewBox="0 0 520 560" aria-hidden="true">
+          <circle cx="160" cy="300" r="26"/>
+          <path d="M160 326v110M160 350l-30 50M160 350l34 40M160 436l-26 80M160 436l26 80"/>
+          <circle cx="360" cy="300" r="26"/>
+          <path d="M360 326v110M360 350l30 50M360 350l-34 40M360 436l-26 80M360 436l26 80"/>
+          <path class="dim" d="M222 268q38-24 76 0M232 250q28-16 56 0"/>
+        </svg>
+        <div class="card">Nothing urgent<br><span class="quiet">1 request waiting for a break</span></div>
+      </div>
+      <p class="caption">You're in a conversation</p>
+    </section>
+    <section class="panel">
+      <div class="art">
+        <svg viewBox="0 0 520 560" aria-hidden="true">
+          <!-- head with glasses, facing us -->
+          <circle cx="260" cy="420" r="70"/>
+          <rect x="206" y="398" width="40" height="28" rx="6"/>
+          <rect x="274" y="398" width="40" height="28" rx="6"/>
+          <path d="M246 410q14-8 28 0M190 408h16M314 408h16"/>
+          <path d="M240 462h40"/>
+          <path d="M190 560q0-50 70-50q70 0 70 50" class="dim"/>
+        </svg>
+        <div class="card">api · DESTRUCTIVE<br>CHECK: main<br>git push --force origin main<br>Rewrites history on main.<br><span class="quiet">APPROVE: swipe up, tap, swipe up<br>DENY: swipe down</span></div>
+      </div>
+      <p class="caption">Something dangerous comes up</p>
+    </section>
+  </div>
+  <footer>Illustration. Card text follows the simulator's force-push card.</footer>
+</body>
+</html>

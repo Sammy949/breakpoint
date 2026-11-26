@@ -2,7 +2,7 @@ node_modules/
 .env
 *.log
 dist/
-glasses/glasses_*.png
+glasses_*.png
 .wrangler/
 glasses/build/
 *.ehpk

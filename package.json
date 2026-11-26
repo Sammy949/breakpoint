@@ -6,7 +6,8 @@
     "pair": "bun scripts/pair.ts",
     "smoke": "bun scripts/relay-smoke.ts",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "visuals": "bun scripts/render-visuals.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
@@ -14,6 +15,7 @@
   },
   "devDependencies": {
     "@types/bun": "^1.4.5",
+    "playwright": "^1.65.1",
     "typescript": "^7.0.2"
   }
 }

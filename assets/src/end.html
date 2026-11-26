@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Video end card, 1920×1080</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  body { width: 1920px; height: 1080px; padding: 120px 140px 96px; display: flex; flex-direction: column; }
+  .lockup { gap: 28px; }
+  .lockup img { width: 70px; height: 84px; }
+  .wordmark { font-size: 64px; }
+  main { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  h1 { font-size: 64px; line-height: 1.15; max-width: 1300px; margin-bottom: 96px; }
+  dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 64px; }
+  dl div { border-top: 1px solid var(--line); padding-top: 24px; }
+  dt { font-size: 24px; color: var(--ink-3); margin-bottom: 12px; }
+  dd { margin: 0; font-size: 32px; line-height: 1.35; }
+  footer { font-size: 26px; color: var(--ink-3); }
+</style>
+</head>
+<body>
+  <div class="lockup"><img src="../mark.svg" alt=""><span class="wordmark">breakpoint</span></div>
+  <main>
+    <h1>Auto mode handles the 97%. <span class="phosphor">Breakpoint handles what's left.</span></h1>
+    <dl>
+      <div><dt>Code</dt><dd>github.com/Sammy949/breakpoint</dd></div>
+      <div><dt>Built</dt><dd>Heads Up, 23–29 Nov 2026</dd></div>
+      <div><dt>Tested</dt><dd>Even Hub simulator, real Claude Code sessions</dd></div>
+    </dl>
+  </main>
+  <footer>Samuel Yahaya</footer>
+</body>
+</html>

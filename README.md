@@ -2,6 +2,8 @@
 
 I leave Claude Code running while I step away, and I often come back to find it stopped on a permission prompt, waiting for me the whole time.
 
+![Breakpoint: Claude Code's approvals and plans, on your Even G2](assets/readme-hero.png)
+
 The opposite worries me more. Anthropic reports that people approve about 97% of Claude Code's permission prompts. When everything gets a yes, the one prompt that deserved a no gets a yes too. And now that auto mode handles the routine ones, what still reaches a person is the hard part: actions the classifier blocked, your own `ask` rules, and plans you want to judge before any code gets written.
 
 So I'm putting those prompts on my Even G2 glasses, and making the dangerous ones hard to approve without reading them.

@@ -1,0 +1,32 @@
+/* Breakpoint visual tokens. Change only with Samuel. */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@700&display=block");
+
+:root {
+  --ground: #06100A;
+  --panel: #0B1A10;
+  --line: #1B3A25;
+  --phosphor: #49F27A;
+  --ink: #E8F5EC;
+  --ink-2: #A9C9B3;
+  --ink-3: #7FA28A;
+}
+
+* { box-sizing: border-box; margin: 0; }
+html, body { background: var(--ground); color: var(--ink); }
+body {
+  font-family: Inter, sans-serif;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+.lockup { display: flex; align-items: center; }
+.wordmark {
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+h1 { font-weight: 500; letter-spacing: -0.02em; text-wrap: balance; }
+p { text-wrap: pretty; }
+.phosphor { color: var(--phosphor); }
