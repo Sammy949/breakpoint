@@ -10,6 +10,7 @@
 import { basename } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { loadConfig } from './config'
+import { callKey } from './key'
 import type { PollResult } from '../shared/protocol'
 
 const WAIT_MS = Number(process.env.BREAKPOINT_WAIT_MS ?? 25 * 60_000)
@@ -72,14 +73,20 @@ const added = await fetch(`${relay}/v1/requests`, {
     tool,
     preview: previewOf(tool, input.tool_input),
     description,
+    // Lets PostToolUse / PermissionDenied / Stop hooks clear this card if it's answered at the desk.
+    session_id: input.session_id,
+    key: callKey(tool, input.tool_input),
   }),
 }).catch(() => null)
 if (!added?.ok) pass()
 
-const cancel = () => fetch(`${relay}/v1/requests/${id}`, { method: 'DELETE', headers }).catch(() => {})
+// Claude Code kills the hook when the dialog is answered at the desk with "No"
+// (the turn is interrupted). Our own deadline passing is a timeout.
+const cancel = (reason: 'elsewhere' | 'timeout') =>
+  fetch(`${relay}/v1/requests/${id}?reason=${reason}`, { method: 'DELETE', headers }).catch(() => {})
 for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP'] as const) {
   process.on(sig, async () => {
-    await cancel()
+    await cancel('elsewhere')
     process.exit(0)
   })
 }
@@ -92,7 +99,7 @@ while (Date.now() < deadline) {
     .catch(() => null)) as PollResult | null
   if (!res || res.status === 'pending') continue
   if (res.status === 'decided') decide(res.behavior, res.redirect)
-  pass() // unknown: cancelled or the relay lost it
+  pass() // elsewhere: answered at the desk. unknown: cancelled, or the relay lost it.
 }
-await cancel()
+await cancel('timeout')
 pass()
