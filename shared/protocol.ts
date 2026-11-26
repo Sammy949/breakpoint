@@ -20,6 +20,11 @@ export type CardRequest = {
   reason: string
   /** What to check: branch, path, host or package. */
   token?: string
+  /** 'plan' for a plan approval (ExitPlanMode); tool calls otherwise. */
+  kind?: 'tool' | 'plan'
+  /** Plan cards: up to three key steps, and how many more there are. */
+  steps?: string[]
+  more?: number
   created_at: number
 }
 

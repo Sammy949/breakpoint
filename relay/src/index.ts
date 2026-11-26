@@ -99,6 +99,13 @@ export default {
         label: clean(body.label, 24) || 'UNKNOWN',
         reason: clean(body.reason, MAX.description),
         ...(body.token ? { token: clean(body.token, 80) } : {}),
+        ...(body.kind === 'plan'
+          ? {
+              kind: 'plan' as const,
+              steps: (Array.isArray(body.steps) ? body.steps : []).slice(0, 3).map(s => clean(s, 80)),
+              more: Math.max(0, Math.min(99, Number(body.more) || 0)),
+            }
+          : {}),
         created_at: Date.now(),
       }
       return json(await stub.add(card, clean(body.session_id, 80), clean(body.key, 64)))

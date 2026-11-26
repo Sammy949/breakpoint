@@ -125,6 +125,7 @@ export function feedPicker(state: PickerState, gesture: Gesture): PickerResult {
 export function redirectsFor(risk: { tier: Tier; label: Risk['label'] | string }, preview: string): string[] {
   const p = preview.toLowerCase()
   const desk = "Wait, I'll do it at my desk"
+  if (risk.label === 'PLAN') return ['Smaller first', 'Tests first', 'Ask me at my desk']
   if (/\bgit\s+push\b/.test(p)) return ['Use a new branch instead', 'Run the tests first', desk]
   if (/\bgit\s+(reset|clean|checkout|restore)\b/.test(p)) return ['Stash the changes first', 'Show me the diff first', desk]
   if (/\brm\b|\bshred\b|\bunlink\b/.test(p)) return ['Move it to a backup folder instead', 'List what would be deleted first', desk]
