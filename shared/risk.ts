@@ -296,7 +296,7 @@ const SQL_DESTRUCTIVE = /\b(drop\s+(table|database|schema|index|view|user)|trunc
 
 function classifyArgv(argv: string[], pipedFrom?: string, cwd?: string, depth = 0): Risk {
   const [cmd] = argv
-  if (!cmd) return t1('Does nothing.')
+  if (!cmd) return t1('Sets a shell variable.')
   const prog = baseName(cmd)
 
   // Something piped into a shell or interpreter: running code you haven't read.
@@ -466,18 +466,83 @@ function redirectRisk(text: string, cwd?: string): Risk | null {
   return worstRisk
 }
 
+/**
+ * Pull out command substitutions, `$(…)`, backticks and `<(…)` / `>(…)`, which
+ * the shell runs even inside double quotes. Each is replaced by a placeholder
+ * word so the outer command still parses, and returned to be classified on its
+ * own. Single-quoted text is left alone: nothing runs in there. `$((…))` is
+ * arithmetic, not a command, but substitutions nested in it are still found.
+ */
+export function substitutions(cmd: string): { outer: string; inner: string[] } {
+  const inner: string[] = []
+  let outer = ''
+  let quote: '"' | "'" | null = null
+  for (let i = 0; i < cmd.length; i++) {
+    const c = cmd[i]
+    if (quote === "'") {
+      if (c === "'") quote = null
+      outer += c
+      continue
+    }
+    if (c === '\\' && i + 1 < cmd.length) {
+      outer += c + cmd[++i]
+      continue
+    }
+    const opens = (c === '$' || (!quote && (c === '<' || c === '>'))) && cmd[i + 1] === '(' && cmd[i + 2] !== '('
+    if (opens) {
+      let depth = 1
+      let j = i + 2
+      let q: string | null = null
+      for (; j < cmd.length && depth > 0; j++) {
+        const d = cmd[j]
+        if (q) {
+          if (d === q) q = null
+        } else if (d === "'" || d === '"') q = d
+        else if (d === '(') depth++
+        else if (d === ')') depth--
+      }
+      inner.push(cmd.slice(i + 2, depth === 0 ? j - 1 : j))
+      outer += `__sub${inner.length - 1}__`
+      i = j - 1
+      continue
+    }
+    if (c === '`') {
+      const end = cmd.indexOf('`', i + 1)
+      inner.push(cmd.slice(i + 1, end < 0 ? cmd.length : end))
+      outer += `__sub${inner.length - 1}__`
+      i = end < 0 ? cmd.length : end
+      continue
+    }
+    if (c === '"') quote = quote ? null : '"'
+    else if (c === "'" && !quote) quote = "'"
+    outer += c
+  }
+  return { outer, inner }
+}
+
 export function classifyShell(command: string, cwd?: string, depth = 0): Risk {
   const risks: Risk[] = []
-  for (const seg of segments(command)) {
+  // What runs inside $(…) and backticks counts as much as the command around it.
+  const subs = substitutions(command)
+  let assignsOnly = false
+  for (const seg of segments(subs.outer)) {
     const { argv, sudo } = strip(words(seg.text))
     // Ignore the redirect operator and its target when reading the command itself.
     const clean = argv.filter((a, i) => !/^\d?>>?$|^&>$/.test(a) && !/^\d?>>?$|^&>$/.test(argv[i - 1] ?? ''))
-    let r = classifyArgv(clean, seg.pipedFrom, cwd, depth)
     const redirect = redirectRisk(seg.text, cwd)
+    // A bare `x=…` explains nothing on a card; let the real command speak.
+    if (!clean.length && !redirect && !sudo) {
+      assignsOnly = true
+      continue
+    }
+    let r = classifyArgv(clean, seg.pipedFrom, cwd, depth)
     if (redirect && redirect.tier > r.tier) r = redirect
     if (sudo && r.tier < 2) r = { ...r, tier: 2, label: 'OUTSIDE PROJECT', reason: `Runs as root: ${r.reason}` }
     risks.push(r)
   }
+  // After the outer commands, so a tie is explained by the command itself.
+  for (const inner of subs.inner) risks.push(depth < 3 ? classifyShell(inner, cwd, depth + 1) : UNKNOWN)
+  if (!risks.length && assignsOnly) return t1('Sets a shell variable.')
   return worst(risks)
 }
 

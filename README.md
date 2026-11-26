@@ -25,7 +25,7 @@ No AI decides anything on your approvals. Rules classify, you decide.
 - **Deny talks back.** *(working)* Swiping down opens three short replies picked for the command, like "Use a new branch instead" for a force push or "List what would be deleted first" for `rm -rf`. Tap one and Claude takes that route instead of stalling. Double tap in that list denies without a reply, so a stray double tap fails safe.
 - **Approves plans.** *(working)* When Claude finishes a plan in plan mode, the glasses show its title and first three steps. Tap to approve and Claude starts building. Swipe down to send feedback like "Smaller first" or "Tests first", and Claude revises the plan and asks again. Anthropic reports people reject 39% of plans but only 3% of individual permission requests, so plans are where your judgement gets used most. The summary is pulled from Claude's own plan by plain code, not rewritten by a model.
 - **Knows when you answered at the desk.** *(working)* Answer in the terminal and the card on your glasses clears itself.
-- **Sorts every request by risk.** *(working)* Plain rules, not a model, decide the tier. They're covered by over 100 test cases, including look-alikes such as `echo "rm -rf /"` that must stay safe:
+- **Sorts every request by risk.** *(working)* Plain rules, not a model, decide the tier. They're covered by over 100 test cases, including look-alikes such as `echo "rm -rf /"` that must stay safe, and commands hidden in `$(…)` or backticks, such as `echo "$(rm -rf ~)"`, that must not:
 
   | Tier | For example | When it shows | To approve |
   | --- | --- | --- | --- |
