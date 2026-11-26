@@ -6,9 +6,20 @@ import {
   OsEventTypeList,
 } from '@evenrealities/even_hub_sdk'
 
+// Step-3 bring-up: render a card and prove every gesture we rely on reaches
+// the app. The card text is a static placeholder until the relay pushes
+// real requests.
+const CARD = [
+  'demo · DESTRUCTIVE            (placeholder)',
+  'git push --force origin main',
+  'Rewrites remote history on main.',
+  'APPROVE: swipe up, then tap',
+  'DENY: swipe down',
+].join('\n')
+
 const bridge = await waitForEvenAppBridge()
 
-const mainText = new TextContainerProperty({
+const main = new TextContainerProperty({
   xPosition: 0,
   yPosition: 0,
   width: 576,
@@ -18,62 +29,40 @@ const mainText = new TextContainerProperty({
   paddingLength: 4,
   containerID: 1,
   containerName: 'main',
-  content: 'Hello from G2!\nTap to count · double-tap to exit.',
+  content: CARD,
   isEventCapture: 1,
 })
 
 const result = await bridge.createStartUpPageContainer(
-  new CreateStartUpPageContainer({
-    containerTotalNum: 1,
-    textObject: [mainText],
-  }),
+  new CreateStartUpPageContainer({ containerTotalNum: 1, textObject: [main] }),
 )
+console.log('breakpoint: page created', result === 0 ? 'ok' : `failed (${result})`)
 
-console.log('Page created:', result === 0 ? 'success' : `failed (${result})`)
-
-// Reads the event type out of one envelope.
-//
-// CLICK_EVENT is 0, and protobuf omits zero-value fields on the wire, so a
-// single tap arrives as an envelope whose `eventType` is `undefined`. The
-// default has to be resolved INSIDE the envelope check. Writing
-// `event.sysEvent?.eventType ?? OsEventTypeList.CLICK_EVENT` instead would
-// read CLICK on events that carry no `sysEvent` at all, so every scroll,
-// exit and audio frame would fire the tap handler.
-function eventTypeOf(envelope?: { eventType?: OsEventTypeList }): OsEventTypeList | null {
+// CLICK_EVENT is 0 and protobuf drops zero fields, so a tap arrives with
+// eventType undefined. Resolve the default only when the envelope exists.
+function typeOf(envelope?: { eventType?: OsEventTypeList }): OsEventTypeList | null {
   if (!envelope) return null
   return envelope.eventType ?? OsEventTypeList.CLICK_EVENT
 }
 
-// Event routing, critical details:
-//   • Taps/double-taps/lifecycle come through `event.sysEvent`.
-//     Scroll gestures come through `event.textEvent`. Never mix them.
-//   • Double-tap → `shutDownPageContainer(1)` is a root-level check: it
-//     must fire no matter which envelope the event arrives in, so users
-//     can always exit the app.
-//   • Check DOUBLE_CLICK_EVENT before CLICK_EVENT.
-let taps = 0
-const unsubscribe = bridge.onEvenHubEvent(event => {
-  const sysType = eventTypeOf(event.sysEvent)
-  const textType = eventTypeOf(event.textEvent)
+const NAMES: Partial<Record<OsEventTypeList, string>> = {
+  [OsEventTypeList.CLICK_EVENT]: 'tap',
+  [OsEventTypeList.DOUBLE_CLICK_EVENT]: 'double tap',
+  [OsEventTypeList.SCROLL_TOP_EVENT]: 'swipe up',
+  [OsEventTypeList.SCROLL_BOTTOM_EVENT]: 'swipe down',
+  [OsEventTypeList.LONG_PRESS_EVENT]: 'long press',
+  [OsEventTypeList.LONG_PRESS_RELEASE_EVENT]: 'long press release',
+}
 
-  if (sysType === OsEventTypeList.DOUBLE_CLICK_EVENT || textType === OsEventTypeList.DOUBLE_CLICK_EVENT) {
-    bridge.shutDownPageContainer(1)
-    return
-  }
-
-  if (sysType === OsEventTypeList.CLICK_EVENT || textType === OsEventTypeList.CLICK_EVENT) {
-    taps += 1
-    bridge.textContainerUpgrade(
-      new TextContainerUpgrade({
-        containerID: 1,
-        containerName: 'main',
-        content: `Taps: ${taps}\nTap to count · double-tap to exit.`,
-      }),
-    )
-    return
-  }
-
-  if (sysType === OsEventTypeList.SYSTEM_EXIT_EVENT || sysType === OsEventTypeList.ABNORMAL_EXIT_EVENT) {
-    unsubscribe()
-  }
+bridge.onEvenHubEvent(event => {
+  const sys = typeOf(event.sysEvent)
+  const text = typeOf(event.textEvent)
+  if (sys === OsEventTypeList.SYSTEM_EXIT_EVENT || sys === OsEventTypeList.ABNORMAL_EXIT_EVENT) return
+  const type = text ?? sys
+  if (type === null) return
+  const name = NAMES[type] ?? `event ${type}`
+  console.log('breakpoint: input', name, text !== null ? '(textEvent)' : '(sysEvent)')
+  bridge.textContainerUpgrade(
+    new TextContainerUpgrade({ containerID: 1, containerName: 'main', content: `${CARD}\nlast input: ${name}` }),
+  )
 })
