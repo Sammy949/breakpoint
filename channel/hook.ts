@@ -7,6 +7,7 @@
 // arrives, or anything goes wrong, the hook prints nothing and the terminal
 // decides. It never approves on its own.
 
+import { writeFileSync } from 'node:fs'
 import { basename } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { loadConfig } from './config'
@@ -33,22 +34,22 @@ export function previewOf(tool: string, input: Record<string, unknown> = {}): st
 }
 
 function decide(behavior: 'allow' | 'deny', redirect?: string): never {
-  process.stdout.write(
-    JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: 'PermissionRequest',
-        decision:
-          behavior === 'allow'
-            ? { behavior: 'allow' }
-            : {
-                behavior: 'deny',
-                message: redirect
-                  ? `The user denied this from Breakpoint and said: "${redirect}"`
-                  : 'The user denied this from Breakpoint.',
-              },
-      },
-    }),
-  )
+  const out = JSON.stringify({
+    hookSpecificOutput: {
+      hookEventName: 'PermissionRequest',
+      decision:
+        behavior === 'allow'
+          ? { behavior: 'allow' }
+          : {
+              behavior: 'deny',
+              message: redirect
+                ? `The user denied this from Breakpoint and said: "${redirect}"`
+                : 'The user denied this from Breakpoint.',
+            },
+    },
+  })
+  process.stdout.write(out)
+  if (process.env.BREAKPOINT_DEBUG_DIR) writeFileSync(`${process.env.BREAKPOINT_DEBUG_DIR}/${Date.now()}-decision.json`, out)
   process.exit(0)
 }
 
@@ -60,7 +61,12 @@ if (!config) pass()
 const { relay, token } = config!
 const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
 
-const input = JSON.parse(await Bun.stdin.text()) as HookInput
+const raw = await Bun.stdin.text()
+const input = JSON.parse(raw) as HookInput
+// Debugging aid: keep a copy of what Claude Code sent (never set by default).
+if (process.env.BREAKPOINT_DEBUG_DIR) {
+  await Bun.write(`${process.env.BREAKPOINT_DEBUG_DIR}/${Date.now()}-${input.tool_name}.json`, raw)
+}
 const tool = input.tool_name ?? 'unknown'
 const id = randomBytes(8).toString('hex').slice(0, 10)
 const description = typeof input.tool_input?.description === 'string' ? input.tool_input.description : ''
