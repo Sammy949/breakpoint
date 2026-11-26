@@ -206,6 +206,13 @@ function connect(p: Pairing) {
     status = 'offline'
     draw()
     if (ev.code === 4001 || ev.code === 4002) return // replaced by another pairing or client
+    if (ev.code === 4003) {
+      // The relay forgot this pairing after a long idle spell: retrying can't help.
+      status = 'unpaired'
+      note.textContent = 'This pairing expired after being idle. Pair again with a new code.'
+      draw()
+      return
+    }
     const delay = Math.min(30_000, 1000 * 2 ** retry++)
     setTimeout(() => connect(p), delay)
   }
