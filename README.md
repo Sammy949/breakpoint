@@ -6,6 +6,12 @@ The opposite worries me more. Anthropic reports that people approve about 97% of
 
 So I'm putting those prompts on my Even G2 glasses, and making the dangerous ones hard to approve without reading them.
 
+![A destructive card on the glasses: "api · DESTRUCTIVE, CHECK: main, git push --force origin main, Rewrites history on main. APPROVE: swipe up, tap, swipe up. DENY: swipe down"](docs/destructive-card.png)
+
+*A force push to main, as it appears in the Even Hub simulator. The approve gesture changes every time.*
+
+**Demo video:** link coming with the submission.
+
 **Claude Code asks for permission or proposes a plan, it shows up on your glasses, and you answer with a gesture.** Safe things wait until you're not busy. Destructive things interrupt you right away, and approving one takes a gesture you have to read off the card.
 
 No AI decides anything on your approvals. Rules classify, you decide.
@@ -16,7 +22,7 @@ No AI decides anything on your approvals. Rules classify, you decide.
 
 - **Answers Claude Code from your glasses.** *(working)* Claude Code runs Breakpoint's hook whenever it's about to ask you something. The request travels through a small relay to the glasses, where a tap allows it and a swipe down denies it. The terminal dialog stays open too, so whichever answer comes first wins and you can always answer at your desk.
 - **Works from anywhere.** *(working)* Laptop and glasses don't need to be on the same network. They meet at a relay you pair with once, using a 6-digit code.
-- **Deny talks back.** *(working)* Swiping down opens three short replies picked for the command, like "Use a new branch instead" for a force push or "List what would be deleted first" for `rm -rf`. Tap one and Claude takes that route instead of stalling. Double tap denies without a reply.
+- **Deny talks back.** *(working)* Swiping down opens three short replies picked for the command, like "Use a new branch instead" for a force push or "List what would be deleted first" for `rm -rf`. Tap one and Claude takes that route instead of stalling. Double tap in that list denies without a reply, so a stray double tap fails safe.
 - **Approves plans.** *(working)* When Claude finishes a plan in plan mode, the glasses show its title and first three steps. Tap to approve and Claude starts building. Swipe down to send feedback like "Smaller first" or "Tests first", and Claude revises the plan and asks again. Anthropic reports people reject 39% of plans but only 3% of individual permission requests, so plans are where your judgement gets used most. The summary is pulled from Claude's own plan by plain code, not rewritten by a model.
 - **Knows when you answered at the desk.** *(working)* Answer in the terminal and the card on your glasses clears itself.
 - **Sorts every request by risk.** *(working)* Plain rules, not a model, decide the tier. They're covered by over 100 test cases, including look-alikes such as `echo "rm -rf /"` that must stay safe:
@@ -71,6 +77,16 @@ This writes Breakpoint's hooks into the project's `.claude/settings.local.json`,
 
 To check the relay on its own, `bun scripts/relay-smoke.ts <relay-url>` plays both laptop and glasses and runs through pairing, verdicts and isolation between laptops.
 
+### Deploying your own relay
+
+A quick tunnel's URL changes every run. For a lasting one, deploy the relay to your own Cloudflare account:
+
+```bash
+cd relay && bun run deploy
+```
+
+Pair against the `workers.dev` URL it prints. To install the app on real glasses, put that URL in `glasses/.env` as `VITE_BREAKPOINT_RELAY` (see `.env.example`) and run `bun run pack` in `glasses/`, which adds the relay to the app's network allowlist. A relay for judges will be linked from the submission page.
+
 ## Privacy
 
 - No account, no telemetry, no analytics.
@@ -94,11 +110,14 @@ Claude Code has a research-preview feature called channels, which can also relay
 - **Tested in the Even Hub simulator, not yet on G2 hardware.** The app's network allowlist lists the relay under both `https://` and `wss://`, because the docs don't say whether WebSockets need their own entry. That's unproven on a real device.
 - **The glasses app only works while it's open.** Even Hub plugins can't run in the background, so a closed app can't show a card. The terminal dialog still works, and Telegram fallback is planned for this.
 - **Waiting requests live in the relay's memory.** If Cloudflare restarts it, they're lost. The hook then steps aside and the terminal dialog decides, so nothing is approved by accident.
+- **Requests don't wait forever.** If nobody answers within 29 minutes, the hook withdraws the card and steps aside, and the terminal dialog decides. `setup.ts` sets Claude Code's hook timeout to 30 minutes and the hook's own deadline a minute earlier, so the hook always ends on its own terms.
 - **Pairing is rate-limited globally,** not per person, so someone guessing codes could block new pairings for a minute.
 
 ## A Claude Code quirk worth knowing
 
-Approving a plan from a hook doesn't work the obvious way. A `PermissionRequest` hook that returns `allow` for `ExitPlanMode` leaves the plan dialog open, and so does an allow that also switches the permission mode. The dialog only closes when the hook echoes the plan back unchanged as `updatedInput`. Breakpoint does that for plans only. Tool calls keep a plain allow, because updated input is checked against your `ask` rules again and could prompt a second time. Tested on Claude Code v2.1.332; it isn't in the docs, so it's in [FEATURE_REQUESTS.md](FEATURE_REQUESTS.md).
+Approving a plan from a hook doesn't work the obvious way. A `PermissionRequest` hook that returns `allow` for `ExitPlanMode` leaves the plan dialog open, and so does an allow that also switches the permission mode. The dialog only closes when the hook echoes the plan back unchanged as `updatedInput`. Breakpoint does that for plans only. Tool calls keep a plain allow, because updated input is checked against your `ask` rules again and could prompt a second time. Tested on Claude Code v2.1.332. It isn't in the docs, but it is known: [issue #90498](https://github.com/anthropics/claude-code/issues/90498) reports the same thing, and [Plannotator](https://github.com/backnotprop/plannotator) echoes the plan for the same reason. It's in [FEATURE_REQUESTS.md](FEATURE_REQUESTS.md).
+
+**Prior art:** Plannotator reviews plans in a browser using the same `PermissionRequest` hook. Breakpoint does it on the glasses, for when you're away from the desk, and covers tool permissions as well as plans.
 
 ## Before building it
 
@@ -114,6 +133,7 @@ Everything here was written during the build window. The starting points from el
 
 - `glasses/` began as the official [Even Hub minimal template](https://github.com/even-realities/evenhub-templates). It's committed unmodified first, so the history shows exactly what changed.
 - `channel/server.ts` is adapted from the permission-relay example in the Claude Code channels docs.
+- The open-source libraries listed under Credits.
 
 ## Credits
 
