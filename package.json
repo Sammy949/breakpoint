@@ -3,9 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit",
     "pair": "bun scripts/pair.ts",
-    "smoke": "bun scripts/relay-smoke.ts"
+    "smoke": "bun scripts/relay-smoke.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
