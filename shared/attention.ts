@@ -8,8 +8,9 @@
 //
 // Delivery by tier:
 //   T3            show now, whatever you're doing
-//   T2 and plans  wait for a break, but never longer than T2_MAX_WAIT_MS
-//   T1            wait for a break, no deadline (the terminal still works)
+//   T2 and plans  wait for a break, but never longer than a minute
+//   T1            wait for a break, but never longer than four minutes, so a
+//                 trivial edit can't stall a session through a long meeting
 
 export type Override = 'auto' | 'busy' | 'free'
 
@@ -23,6 +24,7 @@ export const ATTENTION = {
   /** IMU samples kept for the variance window. */
   motionWindow: 20,
   t2MaxWaitMs: 60_000,
+  t1MaxWaitMs: 4 * 60_000,
 }
 
 /** RMS of 16-bit little-endian mono PCM, normalised to 0..1. Accepts the shapes the bridge may deliver. */
@@ -92,5 +94,5 @@ export function due(
   if (card.tier === 3) return true
   if (!busy) return true
   if (card.tier === 2 || card.kind === 'plan') return now - arrivedAt >= config.t2MaxWaitMs
-  return false
+  return now - arrivedAt >= config.t1MaxWaitMs
 }

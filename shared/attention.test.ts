@@ -71,7 +71,9 @@ describe('due', () => {
     expect(due(t2, 0, ATTENTION.t2MaxWaitMs, true)).toBe(true)
     expect(due(plan, 0, ATTENTION.t2MaxWaitMs, true)).toBe(true)
   })
-  test('T1 waits for a break with no deadline', () => {
-    expect(due(t1, 0, 10 * 60_000, true)).toBe(false)
+  test('T1 waits longer, but never stalls a session indefinitely', () => {
+    expect(due(t1, 0, ATTENTION.t2MaxWaitMs, true)).toBe(false)
+    expect(due(t1, 0, ATTENTION.t1MaxWaitMs - 1, true)).toBe(false)
+    expect(due(t1, 0, ATTENTION.t1MaxWaitMs, true)).toBe(true)
   })
 })
