@@ -2,87 +2,103 @@
 
 I leave Claude Code running while I step away, and I often come back to find it stopped on a permission prompt, waiting for me the whole time.
 
-The other half worries me more. Anthropic reports that people approve about 97% of Claude Code's permission prompts. When everything gets a yes, the one prompt that deserved a no gets a yes too. And the prompts that still reach a person, now that auto mode handles the routine ones, are exactly the risky ones.
+The opposite worries me more. Anthropic reports that people approve about 97% of Claude Code's permission prompts. When everything gets a yes, the one prompt that deserved a no gets a yes too. And now that auto mode handles the routine ones, what still reaches a person is the hard part: actions the classifier blocked, your own `ask` rules, and plans you want to judge before any code gets written.
 
 So I'm putting those prompts on my Even G2 glasses, and making the dangerous ones hard to approve without reading them.
 
-**Claude Code asks for permission, the request shows up on your glasses, and you answer with a gesture.** Safe things wait until you're not busy. Destructive things interrupt you right away, and approving one takes a gesture you have to read off the card.
+**Claude Code asks for permission or proposes a plan, it shows up on your glasses, and you answer with a gesture.** Safe things wait until you're not busy. Destructive things interrupt you right away, and approving one takes a gesture you have to read off the card.
 
-> Early days: this is being built during the Heads Up hackathon (Even Realities, 23 to 29 Nov 2026). The parts marked *working* below run today. Everything else is on the way, and this README changes as it lands.
+No AI decides anything on your approvals. Rules classify, you decide.
+
+> Early days: this is being built during the Heads Up hackathon (Even Realities, 23 to 29 Nov 2026). The parts marked *working* below run today, tested in the Even Hub simulator rather than on real glasses so far. Everything else is on the way, and this README changes as it lands.
 
 ## What it does
 
-- **Answers Claude Code from your glasses.** *(working)* Claude Code runs Breakpoint's hook whenever it's about to ask you something. The terminal dialog stays open too, so whichever answer comes first wins and you can always answer at your desk.
-- **Deny talks back.** *(working)* Saying no can come with a short redirect, like "Use a new branch instead", and Claude takes that route instead of stalling.
-- **Sorts every request by risk.** *(planned)* Plain rules, not a model, decide the tier:
+- **Answers Claude Code from your glasses.** *(working)* Claude Code runs Breakpoint's hook whenever it's about to ask you something. The request travels through a small relay to the glasses, where a tap allows it and a swipe down denies it. The terminal dialog stays open too, so whichever answer comes first wins and you can always answer at your desk.
+- **Works from anywhere.** *(working)* Laptop and glasses don't need to be on the same network. They meet at a relay you pair with once, using a 6-digit code.
+- **Deny talks back.** *(working)* Swiping down opens three short replies picked for the command, like "Use a new branch instead" for a force push or "List what would be deleted first" for `rm -rf`. Tap one and Claude takes that route instead of stalling. Double tap denies without a reply.
+- **Approves plans.** *(working)* When Claude finishes a plan in plan mode, the glasses show its title and first three steps. Tap to approve and Claude starts building. Swipe down to send feedback like "Smaller first" or "Tests first", and Claude revises the plan and asks again. Anthropic reports people reject 39% of plans but only 3% of individual permission requests, so plans are where your judgement gets used most. The summary is pulled from Claude's own plan by plain code, not rewritten by a model.
+- **Knows when you answered at the desk.** *(working)* Answer in the terminal and the card on your glasses clears itself.
+- **Sorts every request by risk.** *(working)* Plain rules, not a model, decide the tier. They're covered by over 100 test cases, including look-alikes such as `echo "rm -rf /"` that must stay safe:
 
   | Tier | For example | When it shows | To approve |
   | --- | --- | --- | --- |
-  | Destructive | `rm -r`, `git push --force`, `git reset --hard`, `curl … \| sh`, writing `.env` or keys, publish and deploy | Right away | A gesture sequence that changes every time |
+  | Destructive | `rm -r`, `git push --force`, `git reset --hard`, `curl … \| sh`, writing `.env` or keys, publish and deploy | Right away | A gesture sequence that changes every time, like "swipe up, then tap" |
   | Outside effects | `git push`, installing packages, network calls, writing outside the project | At your next break, within 60 s | Tap |
-  | Local | Edits inside the project, running tests | Batched at your next break | Long press approves the batch |
+  | Local | Edits inside the project, running tests | Batched at your next break, within 4 minutes | Long press approves the batch |
 
-  Saying no is always the same: swipe down.
-- **Waits for a natural break.** *(planned)* If you're talking or walking, non-urgent cards wait. Voice activity is worked out on the phone from the glasses' microphone, and the audio never leaves the phone.
+  Saying no is always the same: swipe down. A wrong approve gesture switches to a different sequence, so approving a destructive command can't become muscle memory.
+- **Waits for a natural break.** *(working in the simulator with a busy toggle; voice and motion detection are built and unit-tested but not yet tried on real glasses)* If someone is talking near you or you're moving, non-urgent requests wait. Destructive ones still interrupt, outside-effect ones wait at most a minute, and local ones at most four minutes, so a trivial edit never stalls Claude through a long meeting. How loud the microphone is gets worked out on your phone, and the audio itself never leaves it. This is a simple, rule-based take on attention-sensitive alerting, not a model of your attention.
 - **Telegram as a second surface.** *(planned)* If the glasses app isn't open, the request goes to your Telegram instead. Every destructive decision posts a receipt to a channel you pick.
 
 ## Try what works today
 
-You need [Bun](https://bun.sh), Claude Code and the Even Hub simulator (`npm i -g @evenrealities/evenhub-simulator`).
+You need [Bun](https://bun.sh), Claude Code, [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) and the Even Hub simulator (`npm i -g @evenrealities/evenhub-simulator`).
 
 ```bash
 git clone https://github.com/Sammy949/breakpoint
 cd breakpoint && bun install
-cd glasses && bun install
+(cd relay && bun install) && (cd glasses && bun install)
 ```
 
-**The hook.** In any test project, add this to `.claude/settings.json`, with the real path to your clone:
-
-```json
-{
-  "permissions": { "ask": ["Bash(touch:*)"] },
-  "hooks": {
-    "PermissionRequest": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          { "type": "command", "command": "bun /path/to/breakpoint/channel/hook.ts", "timeout": 600 }
-        ]
-      }
-    ]
-  }
-}
-```
-
-The `ask` rule makes sure a prompt appears even in auto mode. Ask Claude to run `touch test.txt`. The request lands in `/tmp/breakpoint/pending/<id>.json` while the terminal dialog waits. Answer it from another terminal:
+**1. Run the relay.** It's a Cloudflare Worker, and it runs locally without an account. A quick tunnel gives it a public URL:
 
 ```bash
-echo allow > /tmp/breakpoint/verdict/<id>
-printf 'deny\nCreate a different file instead.\n' > /tmp/breakpoint/verdict/<id>
+cd relay && bun run dev
+cloudflared tunnel --url http://localhost:8787   # prints https://<random>.trycloudflare.com
 ```
 
-The file hand-off is temporary. The relay to the glasses replaces it.
-
-**The glasses.** In two terminals, from `glasses/`:
+**2. Pair.** On the laptop:
 
 ```bash
-bun run dev
-bun run simulate
+bun scripts/pair.ts https://<random>.trycloudflare.com
 ```
 
-The card is a placeholder for now. It echoes every gesture so you can see the inputs arrive.
+It prints a 6-digit code. Start the glasses app and open it in the simulator, passing the relay URL and the code (on a phone you'd type them into the Breakpoint screen instead):
+
+```bash
+cd glasses && bun run dev
+evenhub-simulator "http://localhost:5180/?relay=https://<random>.trycloudflare.com&code=<code>"
+```
+
+**3. Add the hooks to a project.**
+
+```bash
+bun scripts/setup.ts /path/to/your/project --ask
+```
+
+This writes Breakpoint's hooks into the project's `.claude/settings.local.json`, which stays on your machine. `--ask` also adds `ask` rules for risky commands (`rm`, `git push`, `npm install` and a few more) so they prompt even in auto mode. Start Claude Code in that project and ask it to run `rm -rf some-folder`. The card appears in the simulator.
+
+To check the relay on its own, `bun scripts/relay-smoke.ts <relay-url>` plays both laptop and glasses and runs through pairing, verdicts and isolation between laptops.
 
 ## Privacy
 
 - No account, no telemetry, no analytics.
-- Today nothing leaves your machine: the hook and the simulator both run locally.
-- When the relay lands, it passes messages between your laptop and your phone and stores nothing. Only the command and Claude's description of it leave the laptop.
+- The relay passes messages between your laptop and your phone. Waiting requests are held in memory and never written to disk. The only thing it stores is a hash of your glasses' pairing token.
+- Only a one-line preview of the command or file path, Claude's description of it, and the project folder name leave the laptop. For plans, that's the title and up to three steps. The relay strips control characters and caps their length before they reach the glasses.
+- Your laptop's relay token is saved in `~/.config/breakpoint/config.json`, outside the repo.
 
 ## Why hooks and not channels
 
 Claude Code has a research-preview feature called channels, which can also relay permission prompts. I built that first (`channel/server.ts`, adapted from the [channels reference](https://code.claude.com/docs/en/channels-reference)) and it works at the protocol level. But organisations have to switch channels on, and the development flag doesn't get around that, so anyone on a company account would hit a wall.
 
 [Permission hooks](https://code.claude.com/docs/en/hooks) are a stable, documented part of Claude Code. They work on any account, see the full command instead of a shortened preview, and need one settings entry instead of a startup flag.
+
+## Next
+
+- **Tell your own voice from a meeting around you.** The glasses tag each audio frame as you, someone else or unknown. That could separate "I'm talking" from "a conversation is happening near me", which deserve different waits.
+- **Telegram as a second surface** and team policies.
+
+## Limitations
+
+- **Tested in the Even Hub simulator, not yet on G2 hardware.** The app's network allowlist lists the relay under both `https://` and `wss://`, because the docs don't say whether WebSockets need their own entry. That's unproven on a real device.
+- **The glasses app only works while it's open.** Even Hub plugins can't run in the background, so a closed app can't show a card. The terminal dialog still works, and Telegram fallback is planned for this.
+- **Waiting requests live in the relay's memory.** If Cloudflare restarts it, they're lost. The hook then steps aside and the terminal dialog decides, so nothing is approved by accident.
+- **Pairing is rate-limited globally,** not per person, so someone guessing codes could block new pairings for a minute.
+
+## A Claude Code quirk worth knowing
+
+Approving a plan from a hook doesn't work the obvious way. A `PermissionRequest` hook that returns `allow` for `ExitPlanMode` leaves the plan dialog open, and so does an allow that also switches the permission mode. The dialog only closes when the hook echoes the plan back unchanged as `updatedInput`. Breakpoint does that for plans only. Tool calls keep a plain allow, because updated input is checked against your `ask` rules again and could prompt a second time. Tested on Claude Code v2.1.332; it isn't in the docs, so it's in [FEATURE_REQUESTS.md](FEATURE_REQUESTS.md).
 
 ## Before building it
 
