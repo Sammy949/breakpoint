@@ -259,6 +259,10 @@ form.addEventListener('submit', async e => {
   }
 })
 
+// The relay field defaults to the build's relay (VITE_BREAKPOINT_RELAY in glasses/.env).
+const defaultRelay = import.meta.env.VITE_BREAKPOINT_RELAY as string | undefined
+if (defaultRelay) (form.elements.namedItem('relay') as HTMLInputElement).value = defaultRelay
+
 // ?relay=…&code=… prefills and submits the form (simulator and demo scripts).
 const params = new URLSearchParams(location.search)
 const saved = await loadPairing()

@@ -4,3 +4,5 @@ node_modules/
 dist/
 glasses/glasses_*.png
 .wrangler/
+glasses/build/
+*.ehpk

@@ -7,7 +7,7 @@
     "dev": "vite --port 5180 --strictPort",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "pack": "npm run build && evenhub pack app.json dist",
+    "pack": "vite build && bun scripts/manifest.ts && evenhub pack build/app.json dist -o breakpoint.ehpk",
     "simulate": "evenhub-simulator http://localhost:5180 --automation-port 9898"
   },
   "dependencies": {
