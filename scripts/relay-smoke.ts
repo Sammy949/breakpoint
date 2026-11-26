@@ -109,11 +109,47 @@ check(
   !!(await waitFor(m => m.type === 'remove' && m.id === 'fghij' && m.reason === 'cancelled')),
 )
 
+// A hook killed because the user answered at the desk cancels with reason=elsewhere.
+await post('/v1/requests', { id: 'pqrst', session: 'web', tool: 'Bash', preview: 'rm -f x', description: '' })
+await waitFor(m => m.type === 'add' && m.request.id === 'pqrst')
+await fetch(`${RELAY}/v1/requests/pqrst?reason=elsewhere`, { method: 'DELETE', headers: auth })
+check(
+  'cancel with reason=elsewhere tells the glasses it was answered at the desk',
+  !!(await waitFor(m => m.type === 'remove' && m.id === 'pqrst' && m.reason === 'elsewhere')),
+)
+
 // Another laptop cannot read this room.
 const other = { Authorization: `Bearer ${crypto.randomUUID()}${crypto.randomUUID()}` }
 await post('/v1/requests', { id: 'klmno', session: 'api', tool: 'Bash', preview: 'ls', description: '' })
 const foreign = await (await fetch(`${RELAY}/v1/requests/klmno`, { headers: other })).json()
 check("another token can't see this room's requests", foreign.status === 'unknown', foreign)
+
+// Answered at the desk: PostToolUse / PermissionDenied (by key) and Stop (by session).
+const activity = (body: unknown) => post('/v1/activity', body)
+const addFor = (id: string, session_id: string, key: string) =>
+  post('/v1/requests', { id, session: 'api', tool: 'Bash', preview: 'npm install', description: '', session_id, key })
+
+await addFor('sess1a', 's1', 'key-a')
+await addFor('sess1b', 's1', 'key-b')
+await addFor('sess2a', 's2', 'key-a')
+await waitFor(m => m.type === 'add' && m.request.id === 'sess2a')
+
+await activity({ session_id: 's1', event: 'tool_done', key: 'key-other' })
+check('tool_done with another key leaves cards alone', (await poll('sess1a')).status === 'pending')
+
+await activity({ session_id: 's1', event: 'tool_done', key: 'key-a' })
+check(
+  'tool_done with the same key clears that card',
+  !!(await waitFor(m => m.type === 'remove' && m.id === 'sess1a' && m.reason === 'elsewhere')),
+)
+check('hook is told it was answered elsewhere', (await poll('sess1a')).status === 'elsewhere')
+check('the same key in another session is untouched', (await poll('sess2a')).status === 'pending')
+check('another call in the same session is untouched', (await poll('sess1b')).status === 'pending')
+
+await activity({ session_id: 's1', event: 'stop' })
+check('stop clears the rest of that session', (await poll('sess1b')).status === 'elsewhere')
+check('stop leaves other sessions alone', (await poll('sess2a')).status === 'pending')
+check('bad activity is rejected', (await activity({ session_id: 's1', event: 'nope' })).status === 400)
 
 ws.close()
 console.log(failed ? `\n${failed} failed` : '\nall passed')

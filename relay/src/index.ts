@@ -9,13 +9,14 @@
 //   POST   /v1/pair/start                -> { code }
 //   POST   /v1/requests       CardRequest -> { glasses: boolean }
 //   GET    /v1/requests/:id               -> PollResult
-//   DELETE /v1/requests/:id               -> cancel (answered at the desk / gave up)
+//   DELETE /v1/requests/:id               -> cancel (hook timed out or was killed)
+//   POST   /v1/activity       Activity    -> clear cards answered at the desk
 // Glasses:
 //   POST   /v1/pair/claim     { code }    -> { room, glassesToken }
 //   GET    /v1/glasses?room=&token=       -> WebSocket (ToGlasses / FromGlasses)
 
 import { DurableObject } from 'cloudflare:workers'
-import type { CardRequest, FromGlasses, PollResult, ToGlasses, Verdict } from '../../shared/protocol'
+import type { Activity, CardRequest, FromGlasses, NewRequest, PollResult, ToGlasses, Verdict } from '../../shared/protocol'
 import { PAIR_CODE_TTL_MS } from '../../shared/protocol'
 
 interface Env {
@@ -85,7 +86,7 @@ export default {
     }
 
     if (path === '/v1/requests' && req.method === 'POST') {
-      const body = (await req.json().catch(() => null)) as Partial<CardRequest> | null
+      const body = (await req.json().catch(() => null)) as Partial<NewRequest> | null
       if (!body || !ID_RE.test(body.id ?? '')) return json({ error: 'bad request' }, 400)
       const card: CardRequest = {
         id: body.id!,
@@ -95,13 +96,24 @@ export default {
         description: clean(body.description, MAX.description),
         created_at: Date.now(),
       }
-      return json(await stub.add(card))
+      return json(await stub.add(card, clean(body.session_id, 80), clean(body.key, 64)))
+    }
+
+    if (path === '/v1/activity' && req.method === 'POST') {
+      const body = (await req.json().catch(() => null)) as Partial<Activity> | null
+      if (!body?.session_id || (body.event !== 'stop' && body.event !== 'tool_done')) {
+        return json({ error: 'bad activity' }, 400)
+      }
+      return json(await stub.activity(clean(body.session_id, 80), body.event, clean(body.key, 64)))
     }
 
     const m = path.match(/^\/v1\/requests\/([a-z0-9]+)$/)
     if (m && ID_RE.test(m[1])) {
       if (req.method === 'GET') return json(await stub.poll(m[1]))
-      if (req.method === 'DELETE') return json(await stub.cancel(m[1]))
+      if (req.method === 'DELETE') {
+        const reason = url.searchParams.get('reason') === 'elsewhere' ? 'elsewhere' : 'cancelled'
+        return json(await stub.cancel(m[1], reason))
+      }
     }
 
     return json({ error: 'not found' }, 404)
@@ -111,6 +123,10 @@ export default {
 export class Room extends DurableObject<Env> {
   private pending = new Map<string, CardRequest>()
   private decided = new Map<string, Verdict & { at: number }>()
+  /** Which session and call each pending card belongs to. Never sent to the glasses. */
+  private meta = new Map<string, { session_id: string; key: string }>()
+  /** Cards answered at the desk, until their hook polls once more. */
+  private elsewhere = new Map<string, number>()
   private glasses: WebSocket | null = null
 
   async mintGlassesToken() {
@@ -160,14 +176,17 @@ export class Room extends DurableObject<Env> {
     if (msg.behavior !== 'allow' && msg.behavior !== 'deny') return
     const redirect = msg.behavior === 'deny' && msg.redirect ? clean(msg.redirect, 200) : undefined
     this.pending.delete(msg.id)
+    this.meta.delete(msg.id)
     this.decided.set(msg.id, { behavior: msg.behavior, redirect, at: Date.now() })
     this.send({ type: 'remove', id: msg.id, reason: 'decided' })
   }
 
-  async add(card: CardRequest) {
+  async add(card: CardRequest, session_id = '', key = '') {
     const cutoff = Date.now() - 10 * 60_000
     for (const [id, d] of this.decided) if (d.at < cutoff) this.decided.delete(id)
+    for (const [id, at] of this.elsewhere) if (at < cutoff) this.elsewhere.delete(id)
     this.pending.set(card.id, card)
+    if (session_id) this.meta.set(card.id, { session_id, key })
     this.send({ type: 'add', request: card })
     return { glasses: this.glasses !== null }
   }
@@ -178,13 +197,34 @@ export class Room extends DurableObject<Env> {
       this.decided.delete(id) // hand the verdict over once
       return { status: 'decided', behavior: d.behavior, ...(d.redirect ? { redirect: d.redirect } : {}) }
     }
+    if (this.elsewhere.delete(id)) return { status: 'elsewhere' }
     return this.pending.has(id) ? { status: 'pending' } : { status: 'unknown' }
   }
 
-  async cancel(id: string) {
+  /**
+   * A later hook event from the same session means a dialog was answered at the
+   * desk. PostToolUse / PermissionDenied clear only the card for that exact call
+   * (Claude may run other tools in parallel); Stop clears the whole session.
+   */
+  async activity(session_id: string, event: 'tool_done' | 'stop', key = '') {
+    const cleared: string[] = []
+    for (const [id, m] of this.meta) {
+      if (m.session_id !== session_id) continue
+      if (event === 'tool_done' && (!key || m.key !== key)) continue
+      if (!this.pending.delete(id)) continue
+      this.meta.delete(id)
+      this.elsewhere.set(id, Date.now())
+      this.send({ type: 'remove', id, reason: 'elsewhere' })
+      cleared.push(id)
+    }
+    return { cleared: cleared.length }
+  }
+
+  async cancel(id: string, reason: 'cancelled' | 'elsewhere' = 'cancelled') {
     const had = this.pending.delete(id)
+    this.meta.delete(id)
     this.decided.delete(id)
-    if (had) this.send({ type: 'remove', id, reason: 'cancelled' })
+    if (had) this.send({ type: 'remove', id, reason })
     return { cancelled: had }
   }
 }

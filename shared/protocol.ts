@@ -22,13 +22,21 @@ export type Verdict = { behavior: Behavior; redirect?: string }
 export type PollResult =
   | { status: 'pending' }
   | ({ status: 'decided' } & Verdict)
+  /** Answered at the desk (or the turn ended): the hook should step aside. */
+  | { status: 'elsewhere' }
   | { status: 'unknown' }
 
 /** Relay -> glasses. */
 export type ToGlasses =
   | { type: 'snapshot'; requests: CardRequest[] }
   | { type: 'add'; request: CardRequest }
-  | { type: 'remove'; id: string; reason: 'decided' | 'cancelled' }
+  | { type: 'remove'; id: string; reason: 'decided' | 'cancelled' | 'elsewhere' }
+
+/** Laptop -> relay when a request is created. session_id and key stay on the relay. */
+export type NewRequest = Omit<CardRequest, 'created_at'> & { session_id?: string; key?: string }
+
+/** Laptop -> relay from PostToolUse / PermissionDenied (key) or Stop (whole session). */
+export type Activity = { session_id: string; event: 'tool_done' | 'stop'; key?: string }
 
 /** Glasses -> relay. */
 export type FromGlasses = { type: 'verdict'; id: string } & Verdict
