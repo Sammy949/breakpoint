@@ -1,55 +1,36 @@
 #!/usr/bin/env bun
-// Plan B: Claude Code PermissionRequest hook.
-// Claude Code runs this when it is about to ask for permission. It parks the
-// request and waits for a verdict. Returning no decision leaves the normal
-// terminal dialog in charge.
+// Claude Code PermissionRequest hook.
 //
-// Kill-point version: file-based handoff in BREAKPOINT_DIR. The relay client
-// replaces the polling loop later.
+// Claude Code runs this when it is about to ask for permission. The hook sends
+// the request to the relay, which shows it on the paired glasses, then polls
+// for a verdict. The terminal dialog stays open the whole time; if nothing
+// arrives, or anything goes wrong, the hook prints nothing and the terminal
+// decides. It never approves on its own.
 
-import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs'
-import { join, basename } from 'node:path'
+import { basename } from 'node:path'
 import { randomBytes } from 'node:crypto'
+import { loadConfig } from './config'
+import type { PollResult } from '../shared/protocol'
 
-const DIR = process.env.BREAKPOINT_DIR ?? '/tmp/breakpoint'
-const WAIT_MS = Number(process.env.BREAKPOINT_WAIT_MS ?? 300_000)
+const WAIT_MS = Number(process.env.BREAKPOINT_WAIT_MS ?? 25 * 60_000)
+const POLL_MS = 1000
 
-const input = JSON.parse(await Bun.stdin.text())
-const id = randomBytes(3).toString('hex').slice(0, 5)
-mkdirSync(join(DIR, 'pending'), { recursive: true })
-mkdirSync(join(DIR, 'verdict'), { recursive: true })
-
-const pendingPath = join(DIR, 'pending', `${id}.json`)
-writeFileSync(
-  pendingPath,
-  JSON.stringify({
-    id,
-    session: basename(input.cwd ?? ''),
-    tool_name: input.tool_name,
-    tool_input: input.tool_input,
-    permission_mode: input.permission_mode,
-    received_at: Date.now(),
-  }),
-)
-
-const verdictPath = join(DIR, 'verdict', id)
-const deadline = Date.now() + WAIT_MS
-// Verdict file: first line allow|deny, optional second line = redirect for Claude.
-let behavior: string | null = null
-let redirect = ''
-while (Date.now() < deadline) {
-  if (existsSync(verdictPath)) {
-    const [b, ...rest] = readFileSync(verdictPath, 'utf8').split('\n')
-    behavior = b.trim()
-    redirect = rest.join(' ').trim()
-    break
-  }
-  await Bun.sleep(250)
+type HookInput = {
+  session_id?: string
+  cwd?: string
+  tool_name?: string
+  tool_input?: Record<string, unknown>
 }
-rmSync(pendingPath, { force: true })
-rmSync(verdictPath, { force: true })
 
-if (behavior === 'allow' || behavior === 'deny') {
+/** The one line that tells you what the call does: the command, or the path. */
+export function previewOf(tool: string, input: Record<string, unknown> = {}): string {
+  if (typeof input.command === 'string') return input.command
+  if (typeof input.file_path === 'string') return `${tool} ${input.file_path}`
+  if (typeof input.url === 'string') return `${tool} ${input.url}`
+  return `${tool} ${JSON.stringify(input)}`
+}
+
+function decide(behavior: 'allow' | 'deny', redirect?: string): never {
   process.stdout.write(
     JSON.stringify({
       hookSpecificOutput: {
@@ -61,10 +42,57 @@ if (behavior === 'allow' || behavior === 'deny') {
                 behavior: 'deny',
                 message: redirect
                   ? `The user denied this from Breakpoint and said: "${redirect}"`
-                  : 'The user denied this from Breakpoint (Even G2).',
+                  : 'The user denied this from Breakpoint.',
               },
       },
     }),
   )
+  process.exit(0)
 }
-// No verdict: print nothing, exit 0, terminal dialog decides.
+
+// No decision: the terminal dialog handles it.
+const pass = (): never => process.exit(0)
+
+const config = loadConfig()
+if (!config) pass()
+const { relay, token } = config!
+const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+
+const input = JSON.parse(await Bun.stdin.text()) as HookInput
+const tool = input.tool_name ?? 'unknown'
+const id = randomBytes(8).toString('hex').slice(0, 10)
+const description = typeof input.tool_input?.description === 'string' ? input.tool_input.description : ''
+
+const added = await fetch(`${relay}/v1/requests`, {
+  method: 'POST',
+  headers,
+  body: JSON.stringify({
+    id,
+    session: basename(input.cwd ?? ''),
+    tool,
+    preview: previewOf(tool, input.tool_input),
+    description,
+  }),
+}).catch(() => null)
+if (!added?.ok) pass()
+
+const cancel = () => fetch(`${relay}/v1/requests/${id}`, { method: 'DELETE', headers }).catch(() => {})
+for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP'] as const) {
+  process.on(sig, async () => {
+    await cancel()
+    process.exit(0)
+  })
+}
+
+const deadline = Date.now() + WAIT_MS
+while (Date.now() < deadline) {
+  await Bun.sleep(POLL_MS)
+  const res = (await fetch(`${relay}/v1/requests/${id}`, { headers })
+    .then(r => r.json())
+    .catch(() => null)) as PollResult | null
+  if (!res || res.status === 'pending') continue
+  if (res.status === 'decided') decide(res.behavior, res.redirect)
+  pass() // unknown: cancelled or the relay lost it
+}
+await cancel()
+pass()
