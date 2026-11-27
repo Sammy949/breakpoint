@@ -12,7 +12,7 @@ So I'm putting those prompts on my Even G2 glasses, and making the dangerous one
 
 *A force push to main, as it appears in the Even Hub simulator. The approve gesture changes every time.*
 
-**Demo video:** link coming with the submission.
+**Demo video:** [watch it on YouTube](https://youtu.be/25EyyJDPkzc) (1:51).
 
 **Claude Code asks for permission or proposes a plan, it shows up on your glasses, and you answer with a gesture.** Safe things wait until you're not busy. Destructive things interrupt you right away, and approving one takes a gesture you have to read off the card.
 
@@ -171,6 +171,8 @@ Everything here was written during the build window. The starting points from el
 ## Credits
 
 Built on the [Even Hub SDK](https://hub.evenrealities.com/docs) and template, the [Model Context Protocol SDK](https://github.com/modelcontextprotocol/typescript-sdk), [zod](https://github.com/colinhacks/zod), [Vite](https://github.com/vitejs/vite) and TypeScript.
+
+The demo video uses "Neo Soul" by Mr Smith ([CC BY 4.0](https://freemusicarchive.org/music/mr-smith/a-new-roar/neo-soul/)) and a G2 photo by Even Realities.
 
 Not affiliated with Anthropic or Even Realities.
 
